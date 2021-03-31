@@ -29,6 +29,13 @@ def _extract_sqlalchemy_orm_columns(model: Model) -> typing.Dict[str, Strawberry
 
 class SchemaTypeMeta(type):
     def __new__(meta: 'SchemaTypeMeta', name: str, bases: tuple, namespace: dict) -> typing.Type:
+        '''
+        Sweetens strawberry.type with the following features:
+
+        * Ability to extend the type's fields using a SQLAlchemy database model
+        * Adds the ability to set the description from the class's docstring
+        * Sorts the type's fields in alphabetical order for easy searching
+        '''
         if not bases:
             return type.__new__(meta, name, bases, namespace)
 
@@ -49,9 +56,10 @@ class SchemaTypeMeta(type):
 
             if hasattr(Meta, 'sqlalchemy_model'):
                 fields = _extract_sqlalchemy_orm_columns(Meta.sqlalchemy_model)
+                only_fields = getattr(Meta, 'sqlalchemy_only_fields', ())
                 cls_namespce.setdefault('__annotations__', {})
                 for field_name, field_value in fields.items():
-                    if field_name in cls_namespce:
+                    if field_name in cls_namespce or field_name not in only_fields:
                         continue
 
                     cls_namespce['__annotations__'][field_name] = field_value.type

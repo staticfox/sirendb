@@ -2,21 +2,9 @@ from __future__ import annotations
 
 import strawberry
 
-from sirendb.core.strawberry import (
-    SchemaFieldBase,
-    SchemaTypeBase,
-)
-from sirendb.models.user import User
+from sirendb.core.strawberry import SchemaFieldBase
 
-
-class UserNode(SchemaTypeBase):
-    class Meta:
-        name = 'User'
-        sqlalchemy_model = User
-
-    name: str = strawberry.field(
-        description='The name of the siren'
-    )
+from ..types.user import UserNode
 
 
 class Query(SchemaFieldBase):

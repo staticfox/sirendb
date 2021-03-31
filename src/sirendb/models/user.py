@@ -26,3 +26,24 @@ class User(db.Model):
             "The user's E-Mail address."
         )
     )
+    password_hash = db.Column(
+        db.String(512),
+        nullable=False,
+        doc=(
+            'Password hash'
+        )
+    )
+    register_timestamp = db.Column(
+        db.DateTime,
+        nullable=False,
+        doc=(
+            'Identifies when the user registered their account.'
+        )
+    )
+    email_verified_timestamp = db.Column(
+        db.DateTime,
+        default=None,
+        doc=(
+            'Identifies when the user verified their email address.'
+        )
+    )

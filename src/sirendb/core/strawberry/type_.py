@@ -15,14 +15,14 @@ def _extract_sqlalchemy_orm_columns(model: Model) -> typing.Dict[str, Strawberry
 
     table = model.__dict__['__table__']
     for column in table.columns:
-        fields[column.key] = StrawberryField(
-            python_name=column.key,
-            graphql_name=column.key,
-            type_=column.type.python_type,
-            is_optional=column.nullable,
-            description=column.doc,
-            default_value=column.default,
-        )
+        fields[column.key] = StrawberryField(**{
+            'python_name': column.key,
+            'graphql_name': column.key,
+            'type_': column.type.python_type,
+            'is_optional': column.nullable,
+            'default_value': column.default,
+            'description': column.doc,
+        })
 
     return fields
 
@@ -75,15 +75,68 @@ class SchemaTypeMeta(type):
         if description is not None:
             description = description.strip().rstrip()
 
-        cls = type.__new__(meta, name, (object,), cls_namespce)
+        # This sorts the namespace & annotations so that the fields
+        # without default values appear before the ones with default
+        # values. This is required so that dataclass can initialize
+        # the class without raising a exception:
+        #
+        # >>> TypeError: non-default argument 'email' follows default argument
+        #
+
+        without_default = []
+        with_default = []
+
+        for field_name, field_value in cls_namespce.items():
+            if not isinstance(field_value, StrawberryField):
+                continue
+
+            if field_value.default_value:
+                with_default.append((field_name, field_value))
+            else:
+                without_default.append((field_name, field_value))
+
+        # without_default.sort(key=lambda pair: pair[0])
+        # with_default.sort(key=lambda pair: pair[0])
+
+        # Python 3.7+ guarentees that the built-in dict class
+        # will retain insertion order, so an OrderedDict is
+        # not needed.
+        new_cls_namespce = {}
+        new_cls_annotations = {}
+
+        # Insert fields without default values first.
+        for pair in without_default:
+            new_cls_namespce[pair[0]] = pair[1]
+
+        # Insert fields with default values after.
+        for pair in with_default:
+            new_cls_namespce[pair[0]] = pair[1]
+
+        old_annotations = dict(cls_namespce['__annotations__'])
+        # Since new_cls_namespce is correctly sorted, we can re-apply
+        # the annotations in the same order.
+        for key, value in new_cls_namespce.items():
+            new_cls_annotations[key] = old_annotations[key]
+
+        # Add the annotations then re-add the rest of the namespace.
+        new_cls_namespce['__annotations__'] = new_cls_annotations
+
+        for key, value in cls_namespce.items():
+            if key in new_cls_namespce:
+                continue
+            new_cls_namespce[key] = value
+
+        # Setup our Strawberry type so dataclass is happy.
+        cls = type.__new__(meta, name, (object,), new_cls_namespce)
         straberry_cls = strawberry.type(
             cls,
             name=cls_name,
             description=description,
         )
 
-        # Alphabetically sort fields so they're easy to find
-        # within the documentation.
+        # Now that everything has been created properly, we can
+        # re-order the type definition so fields will be sent
+        # to GraphQL in alphabetical order.
         straberry_cls._type_definition._fields = sorted(
             straberry_cls._type_definition._fields,
             key=lambda field: field.graphql_name

@@ -29,17 +29,21 @@ class SchemaFieldRegistry(type):
     @classmethod
     def create_root_type(meta: 'SchemaFieldRegistry', type_name: str) -> typing.Type:
         namespce = {}
+        namespce_class_map = {}
         for Class in meta.registry.get(type_name, ()):
             for attr_name, attr_value in Class.__dict__.items():
+                # FIXME: One glaring issue with this approach is that now resolvers may not
+                #        call member functions.
                 if attr_name.startswith('_') or not isinstance(attr_value, StrawberryField):
                     continue
                 if attr_name in namespce:
                     raise RuntimeError(
                         f'You tried to specify {Class.__module__}.{type_name}.{attr_name}\n'
-                        f'but it is already defined in {namespce[attr_name].__module__}.{type_name}.\n'
+                        f'but it is already defined in {namespce_class_map[attr_name].__module__}.{type_name}.\n'
                         'Remove or rename one of the entries.'
                     )
                 namespce[attr_name] = attr_value
+                namespce_class_map[attr_name] = Class
 
         # Alphabetically sort fields so they're easy to find
         # within the documentation.

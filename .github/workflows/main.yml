@@ -29,5 +29,13 @@ jobs:
 
       - name: Run tests
         run: |
+          dbversion=$(createdb --version)
+          pgversion=$(python -c "import re; print(re.compile(r'createdb \(\S+\ ([^\.]+)').match('${dbversion}').groups()[0])")
+          export PATH=/usr/lib/postgresql/$pgversion/bin:$PATH
+
+          which pg_ctl
+          which createdb
+          which pg_config
+
           coverage run -m pytest
-          coverage report -m
+          coverage report

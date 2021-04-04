@@ -32,7 +32,7 @@ def postgresql():
     temp_dir = tempfile.mkdtemp(prefix='sirendb.')
 
     subprocess.run([
-        'initdb', '--encoding', 'UTF-8', '--pgdata', temp_dir
+        'pg_ctl', 'initdb', '--encoding', 'UTF-8', '--pgdata', temp_dir
     ], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
     subprocess.run([

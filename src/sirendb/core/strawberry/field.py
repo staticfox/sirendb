@@ -17,8 +17,8 @@ class SchemaFieldRegistry(type):
 
         if name not in ('Query', 'Mutation'):
             raise RuntimeError(
-                'You subclassed SchemaFieldBase but your class\'s name is neither\n'
-                'Query nor Mutation. Rename your class or remove SchemaFieldBase.'
+                'You subclassed GraphQLField but your class\'s name is neither\n'
+                'Query nor Mutation. Rename your class or remove GraphQLField.'
             )
 
         meta.registry.setdefault(name, set()).add(cls)
@@ -34,6 +34,7 @@ class SchemaFieldRegistry(type):
             for attr_name, attr_value in Class.__dict__.items():
                 # FIXME: One glaring issue with this approach is that now resolvers may not
                 #        call member functions.
+                # print(f'{Class.__name__}.{attr_name} {attr_value=}')
                 if attr_name.startswith('_') or not isinstance(attr_value, StrawberryField):
                     continue
                 if attr_name in namespce:
@@ -54,5 +55,5 @@ class SchemaFieldRegistry(type):
         ))
 
 
-class SchemaFieldBase(metaclass=SchemaFieldRegistry):
+class GraphQLField(metaclass=SchemaFieldRegistry):
     pass

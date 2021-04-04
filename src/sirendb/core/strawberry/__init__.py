@@ -1,10 +1,10 @@
 import strawberry
 
 from .field import (
+    GraphQLField,
     SchemaFieldRegistry,
-    SchemaFieldBase,
 )
-from .type_ import SchemaTypeBase
+from .type_ import GraphQLType
 
 
 def create_schema():

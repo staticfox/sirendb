@@ -3,8 +3,8 @@ import strawberry
 
 from sirendb.core.db import db
 from sirendb.core.strawberry import (
-    SchemaFieldBase,
-    SchemaTypeBase,
+    GraphQLField,
+    GraphQLType,
 )
 
 
@@ -33,7 +33,7 @@ class TableOne(db.Model):
     )
 
 
-class TableOneNode(SchemaTypeBase):
+class TableOneNode(GraphQLType):
     class Meta:
         name = 'TableOne'
         sqlalchemy_model = TableOne
@@ -46,7 +46,7 @@ class TableOneNode(SchemaTypeBase):
     )
 
 
-class Query(SchemaFieldBase):
+class Query(GraphQLField):
     @strawberry.field(description='OwO Whats this?')
     def get_table_one(self) -> TableOneNode:
         return TableOneNode(

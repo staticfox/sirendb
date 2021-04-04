@@ -1,6 +1,6 @@
 import pytest
 
-from sirendb.core.strawberry import SchemaFieldBase
+from sirendb.core.strawberry import GraphQLField
 
 
 pytest_plugins = (
@@ -80,5 +80,5 @@ query {
 
 def test_field_base_is_subclassed_with_invalid_name():
     with pytest.raises(RuntimeError):
-        class WrongSubclass(SchemaFieldBase):
+        class WrongSubclass(GraphQLField):
             key: str

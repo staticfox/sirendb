@@ -3,12 +3,12 @@ import typing
 
 import strawberry
 
-from sirendb.core.strawberry import SchemaFieldBase
+from sirendb.core.strawberry import GraphQLField
 
 from ..types.siren import Siren
 
 
-class Query(SchemaFieldBase):
+class Query(GraphQLField):
     @strawberry.field(
         description=(
             'Allows you to search through the list of sirens known to SirenDB.'

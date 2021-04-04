@@ -5,6 +5,8 @@ class User(db.Model):
     '''
     Describes an authenticated user account.
     '''
+    __tablename__ = 'users'
+
     id = db.Column(
         db.Integer,
         primary_key=True,

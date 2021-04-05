@@ -40,7 +40,7 @@ def _extract_sqlalchemy_orm_columns(model: Model) -> typing.Dict[str, Strawberry
 
             # So people are aware when they read the docs.
             if description:
-                description += ' - '
+                description += ' '
             description += f'String size may not exceed {max_length} characters.'
 
         fields[column.key] = StrawberryField(**{

@@ -2,7 +2,6 @@ import tempfile
 import secrets
 import shutil
 import subprocess
-import sys
 
 import pytest
 
@@ -10,12 +9,16 @@ from sirendb.core.db import db as db_
 from sirendb.web.flask import create_app
 
 
+class DBFixtureNotIncluded:
+    pass
+
+
 @pytest.fixture(scope='session')
 def app():
     app = create_app(
         config_file=None,
         config={
-            'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
+            'SQLALCHEMY_DATABASE_URI': DBFixtureNotIncluded,
             'SQLALCHEMY_TRACK_MODIFICATIONS': False,
             'SECRET_KEY': secrets.token_hex(24),
         }
@@ -25,7 +28,7 @@ def app():
 
 @pytest.fixture
 def client(app):
-    with app.app_context() as app_context:
+    with app.app_context():
         yield app.test_client()
 
 
@@ -34,7 +37,7 @@ def postgresql():
     temp_dir = tempfile.mkdtemp(prefix='sirendb.')
 
     subprocess.run([
-        'pg_ctl', 'initdb', '--encoding', 'UTF-8', '--pgdata', temp_dir
+        'pg_ctl', 'initdb', '--pgdata', temp_dir
     ], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
     subprocess.run([
@@ -45,7 +48,7 @@ def postgresql():
         'createdb', '-h', temp_dir, 'sirendb_test'
     ], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
-    yield f'postgresql:///sirendb_test?host={temp_dir}'
+    yield f'postgresql+psycopg2:///sirendb_test?host={temp_dir}'
 
     try:
         subprocess.run([
@@ -57,6 +60,8 @@ def postgresql():
 
 @pytest.fixture(scope='session')
 def database(app, postgresql):
+    app.config['SQLALCHEMY_DATABASE_URI'] = postgresql
+
     with app.app_context():
         db_.create_all()
 

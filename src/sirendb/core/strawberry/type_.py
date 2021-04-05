@@ -4,6 +4,12 @@ from flask_sqlalchemy import Model
 import strawberry
 from strawberry.field import StrawberryField
 
+from .scalars import LimitedStringScalar
+
+
+class StringLimitExceeded(Exception):
+    pass
+
 
 def _extract_sqlalchemy_orm_columns(model: Model) -> typing.Dict[str, StrawberryField]:
     fields = {}
@@ -15,13 +21,35 @@ def _extract_sqlalchemy_orm_columns(model: Model) -> typing.Dict[str, Strawberry
 
     table = model.__dict__['__table__']
     for column in table.columns:
+        type_ = column.type.python_type
+        description = column.doc
+
+        # Allow the type itself to raise the GraphQL error
+        # instead of doing basic repetitive string size checks
+        # in every single resolver.
+        if column.type.python_type is str and column.type.length:
+            type_ = LimitedStringScalar
+            max_length = column.type.length
+
+            def parse_value(value, _max_length=max_length):
+                if len(value) > _max_length:
+                    raise StringLimitExceeded
+                return value
+
+            type_._scalar_definition.parse_value = parse_value
+
+            # So people are aware when they read the docs.
+            if description:
+                description += ' - '
+            description += f'String size may not exceed {max_length} characters.'
+
         fields[column.key] = StrawberryField(**{
             'python_name': column.key,
             'graphql_name': column.key,
-            'type_': column.type.python_type,
+            'type_': type_,
             'is_optional': column.nullable,
             'default_value': column.default,
-            'description': column.doc,
+            'description': description,
         })
 
     return fields
@@ -41,6 +69,7 @@ class SchemaTypeMeta(type):
 
         cls_name = str(name)
         cls_namespce = dict(namespace)
+        cls_namespce.setdefault('__annotations__', {})
 
         # Description is set based on the following priority list:
         #   1) cls.Meta.description
@@ -59,7 +88,6 @@ class SchemaTypeMeta(type):
             if hasattr(Meta, 'sqlalchemy_model'):
                 fields = _extract_sqlalchemy_orm_columns(Meta.sqlalchemy_model)
                 only_fields = getattr(Meta, 'sqlalchemy_only_fields', ())
-                cls_namespce.setdefault('__annotations__', {})
                 for field_name, field_value in fields.items():
                     if field_name in cls_namespce or field_name not in only_fields:
                         continue
@@ -70,6 +98,18 @@ class SchemaTypeMeta(type):
                 model_doc = Meta.sqlalchemy_model.__dict__.get('__doc__')
                 if model_doc and not description:
                     description = model_doc
+
+            if hasattr(Meta, 'node'):
+                if not namespace.get('__isinput__') or not getattr(Meta, 'only_fields', None):
+                    raise RuntimeError(
+                        'Meta.node has only been tested with __isinput__ and only_fields. '
+                        'Feel free to remove this check and proceed at your own risk.'
+                    )
+                for field_name in Meta.only_fields:
+                    if field_name in cls_namespce:  # ??
+                        continue
+                    cls_namespce[field_name] = Meta.node.__dataclass_fields__[field_name]
+                    cls_namespce['__annotations__'][field_name] = Meta.node.__annotations__[field_name]
 
             if getattr(Meta, 'description', None):
                 description = Meta.description

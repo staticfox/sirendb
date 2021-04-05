@@ -1,4 +1,3 @@
-from flask import make_response, request
 from flask_login import login_user
 import strawberry
 from werkzeug.security import check_password_hash

@@ -16,15 +16,6 @@ query getMe {
 }
 '''
 
-LOGIN_QUERY = '''
-mutation login($username: String!, $password: String!) {
-  login(form: {username: $username, password: $password}) {
-    ok
-    message
-  }
-}
-'''
-
 LOGOUT_QUERY = '''
 mutation logout {
   logout {
@@ -35,10 +26,10 @@ mutation logout {
 '''
 
 
-def test_basic_login(client, db):
+def test_basic_login(client, db, LOGIN_QUERY):
     response = client.post(
         '/api/v1/graphql',
-        json={ 'query': VIEWER_QUERY }
+        json={'query': VIEWER_QUERY}
     )
     assert response.status_code == 401
     assert response.json is None
@@ -76,7 +67,7 @@ def test_basic_login(client, db):
 
     response = client.post(
         '/api/v1/graphql',
-        json={ 'query': VIEWER_QUERY }
+        json={'query': VIEWER_QUERY}
     )
     assert response.status_code == 200
     assert response.json == {
@@ -90,7 +81,7 @@ def test_basic_login(client, db):
 
     response = client.get(
         '/api/v1/auth-graphql',
-        json = { 'query': LOGOUT_QUERY }
+        json={'query': LOGOUT_QUERY}
     )
     assert response.status_code == 200
     assert response.json == {
@@ -104,7 +95,7 @@ def test_basic_login(client, db):
 
     response = client.post(
         '/api/v1/graphql',
-        json={ 'query': VIEWER_QUERY }
+        json={'query': VIEWER_QUERY}
     )
     assert response.status_code == 401
     assert response.json is None

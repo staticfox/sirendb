@@ -1,4 +1,3 @@
-import pytest
 import strawberry
 
 from sirendb.core.strawberry import (
@@ -11,6 +10,7 @@ pytest_plugins = (
     'tests.fixtures',
     'tests.core.strawberry.fixtures',
 )
+
 
 # @strawberry.input(description="This is the input's description.")
 class Input(GraphQLType):
@@ -57,7 +57,6 @@ def test_input_object_has_correct_attributes(client, introspection_graphql_query
     assert response.status_code == 200
 
     types = response.json.get('data', {}).get('__schema', {}).get('types', [])
-    example_input = None
 
     missing_objects = {
         'ExampleInput',
@@ -111,7 +110,7 @@ def test_input_object_has_correct_attributes(client, introspection_graphql_query
             continue
         # print(type_)
         assert type_['description'] == gql_object['description']
-        assert type_['fields'] ==  gql_object['fields']
+        assert type_['fields'] == gql_object['fields']
         missing_objects.remove(type_['name'])
     assert not missing_objects
 

@@ -8,7 +8,7 @@ import yaml
 from sirendb.core.auth import login_manager
 from sirendb.core.db import db
 from sirendb.core.strawberry import GraphQLSchema
-import sirendb.v1
+import sirendb.v1  # noqa
 
 
 def create_app(config_file: str = 'etc/config.yml', config: dict = None):

@@ -1,5 +1,3 @@
-import strawberry
-
 from sirendb.core.strawberry import GraphQLType
 from sirendb.models.user import User
 

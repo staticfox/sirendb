@@ -47,6 +47,8 @@ class TableOneNode(GraphQLType):
 
 
 class Query(GraphQLField):
+    __endpoints__ = ('/api/v1/test-graphql',)
+
     @strawberry.field(description='OwO Whats this?')
     def get_table_one(self) -> TableOneNode:
         return TableOneNode(

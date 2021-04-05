@@ -1,30 +1,66 @@
 from flask import make_response, request
 from flask_login import login_user
+import strawberry
 from werkzeug.security import check_password_hash
 
 from sirendb.models.user import User
+from sirendb.core.strawberry import (
+    GraphQLField,
+    GraphQLType,
+)
 
-from .. import auth_endpoints
+
+class Input(GraphQLType):
+    '''
+    Input type of login.
+    '''
+    __typename__ = 'LoginInput'
+    __isinput__ = True
+
+    username: str = strawberry.field(
+        description='The username you would like to be known as.'
+    )
+    password: str = strawberry.field(
+        description='Password used to verify account ownership.'
+    )
 
 
-@auth_endpoints.route('/api/v1/auth/login', methods=['POST'])
-def login():
-    username = request.form.get('username')
-    password = request.form.get('password')
+class Output(GraphQLType):
+    '''
+    Return type of login.
+    '''
+    __typename__ = 'LoginPayload'
 
-    if not username or not password:
-        return abort(401)
+    ok: bool = strawberry.field(
+        description='Whether or not your login request was processed successfully.'
+    )
+    message: str = strawberry.field(
+        description='Status message related to logging in.'
+    )
 
-    user = User.query.filter_by(username=username).one_or_none()
-    if not user:
-        return abort(401)
 
-    if not check_password_hash(user.password_hash, password):
-        return abort(401)
+class Mutation(GraphQLField):
+    __endpoints__ = ('/api/v1/auth-graphql',)
 
-    login_user(user)
+    @strawberry.field(description='Log out of sirendb.')
+    def login(self, form: Input) -> Output:
+        user = User.query.filter_by(username=form.username).one_or_none()
+        if not user:
+            return Output(
+                ok=False,
+                message='Username not found.',
+            )
 
-    # return redirect(... webapp url ...)
-    return make_response({
-        'ok': True
-    })
+        if not check_password_hash(user.password_hash, form.password):
+            return Output(
+                ok=False,
+                message='Invalid password.',
+            )
+
+        login_user(user)
+
+        # return redirect(... webapp url ...)
+        return Output(
+            ok=True,
+            message='',
+        )

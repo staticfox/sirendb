@@ -1,14 +1,34 @@
-from flask import make_response
 from flask_login import logout_user
+import strawberry
 
-from .. import auth_endpoints
+from sirendb.core.strawberry import (
+    GraphQLField,
+    GraphQLType,
+)
 
 
-@auth_endpoints.route('/api/v1/auth/logout', methods=['GET'])
-def logout():
-    logout_user()
+class Output(GraphQLType):
+    '''
+    Return type of logout.
+    '''
+    __typename__ = 'LogoutPayload'
 
-    # return redirect(... webapp url ...)
-    return make_response({
-        'ok': True
-    })
+    ok: bool = strawberry.field(
+        description='Whether or not your logout request was processed successfully.'
+    )
+    message: str = strawberry.field(
+        description='Status message related to logging out.'
+    )
+
+
+class Mutation(GraphQLField):
+    __endpoints__ = ('/api/v1/auth-graphql',)
+
+    @strawberry.field(description='Log out of sirendb.')
+    def logout(self) -> Output:
+        logout_user()
+
+        return Output(
+            ok=True,
+            message='',
+        )

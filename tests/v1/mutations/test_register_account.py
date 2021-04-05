@@ -29,7 +29,7 @@ mutation makeAccount($username: String!, $email: String!, $password: String!) {
 @freeze_time('2021-04-03T06:13:09.291212')
 def test_example_mutation_works(client, db):
     response = client.post(
-        '/api/v1/graphql',
+        '/api/v1/auth-graphql',
         json={
             'query': CREATE_QUERY,
             'operationName': 'makeAccount',

@@ -52,6 +52,8 @@ class Output(GraphQLType):
 
 # TODO: Move this out of GraphQL and in to v1_auth
 class Mutation(GraphQLField):
+    __endpoints__ = ('/api/v1/auth-graphql',)
+
     @strawberry.field(description='Register for a SirenDB account.')
     def register_account(self, form: Input) -> Output:
         failed_args = {'ok': False, 'user': None}

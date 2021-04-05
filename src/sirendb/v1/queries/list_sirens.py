@@ -9,6 +9,8 @@ from ..types.siren import Siren
 
 
 class Query(GraphQLField):
+    __endpoints__ = ('/api/v1/graphql',)
+
     @strawberry.field(
         description=(
             'Allows you to search through the list of sirens known to SirenDB.'

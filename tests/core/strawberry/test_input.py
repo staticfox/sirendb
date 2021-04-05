@@ -40,6 +40,8 @@ class Output(GraphQLType):
 
 
 class Mutation(GraphQLField):
+    __endpoints__ = ('/api/v1/test-graphql',)
+
     @strawberry.field(description='This is example mutation.')
     def run_example_mutation(self, form: Input) -> Output:
         return Output(ok=True, message=form.username)
@@ -47,7 +49,7 @@ class Mutation(GraphQLField):
 
 def test_input_object_has_correct_attributes(client, introspection_graphql_query):
     response = client.post(
-        '/api/v1/graphql',
+        '/api/v1/test-graphql',
         json={
             'query': introspection_graphql_query
         }
@@ -116,7 +118,7 @@ def test_input_object_has_correct_attributes(client, introspection_graphql_query
 
 def test_example_mutation_works(client):
     response = client.post(
-        '/api/v1/graphql',
+        '/api/v1/test-graphql',
         json={
             'query': '''
 mutation {

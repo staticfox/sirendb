@@ -10,6 +10,8 @@ from ..types.user import UserNode
 
 
 class Query(GraphQLField):
+    __endpoints__ = ('/api/v1/graphql',)
+
     @strawberry.field(description='Get the viewer')
     def viewer(self) -> Optional[UserNode]:
         if not current_user.is_authenticated:

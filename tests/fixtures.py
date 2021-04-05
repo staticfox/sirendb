@@ -1,4 +1,5 @@
 import tempfile
+import secrets
 import shutil
 import subprocess
 import sys
@@ -16,6 +17,7 @@ def app():
         config={
             'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
             'SQLALCHEMY_TRACK_MODIFICATIONS': False,
+            'SECRET_KEY': secrets.token_hex(24),
         }
     )
     yield app

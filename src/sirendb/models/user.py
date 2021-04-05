@@ -1,3 +1,6 @@
+from werkzeug.security import generate_password_hash
+
+from sirendb.core.auth import login_manager
 from sirendb.core.db import db
 
 
@@ -49,3 +52,27 @@ class User(db.Model):
             'Identifies when the user verified their email address.'
         )
     )
+
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_active(self):
+        # TODO: Check email verification status, suspended, banned, etc
+        return True
+
+    @property
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return str(self.id)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(user_id)

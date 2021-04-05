@@ -4,7 +4,6 @@ from typing import Optional
 
 import strawberry
 import sqlalchemy as sa
-from werkzeug.security import generate_password_hash
 
 from sirendb.core.db import db
 from sirendb.core.strawberry import (
@@ -51,6 +50,7 @@ class Output(GraphQLType):
     )
 
 
+# TODO: Move this out of GraphQL and in to v1_auth
 class Mutation(GraphQLField):
     @strawberry.field(description='Register for a SirenDB account.')
     def register_account(self, form: Input) -> Output:
@@ -78,14 +78,12 @@ class Mutation(GraphQLField):
             why = 'email' if user.email == form.email else 'username'
             return Output(message=f'Account with {why} already exists.', **failed_args)
 
-        hashed_pw = generate_password_hash(form.password)
-
         user = User(
             username=form.username,
             email=form.email,
-            password_hash=hashed_pw,
             register_timestamp=datetime.utcnow(),
         )
+        user.set_password(form.password)
         db.session.add(user)
         db.session.commit()
 

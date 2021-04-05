@@ -9,6 +9,7 @@ class UserNode(GraphQLType):
         name = 'User'
         sqlalchemy_model = User
         sqlalchemy_only_fields = (
+            'id',
             'username',
             'email',
             'register_timestamp',

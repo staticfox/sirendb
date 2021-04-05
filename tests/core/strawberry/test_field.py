@@ -1,6 +1,6 @@
 import pytest
 
-from sirendb.core.strawberry import SchemaFieldBase
+from sirendb.core.strawberry import GraphQLField
 
 
 pytest_plugins = (
@@ -11,7 +11,7 @@ pytest_plugins = (
 
 def test_table_one_object_is_mapped_correctly(client, introspection_graphql_query):
     response = client.post(
-        '/api/v1/graphql',
+        '/api/v1/test-graphql',
         json={
             'query': introspection_graphql_query
         }
@@ -55,7 +55,7 @@ def test_table_one_object_is_mapped_correctly(client, introspection_graphql_quer
 
 def test_query_from_table_one(client):
     response = client.post(
-        '/api/v1/graphql',
+        '/api/v1/test-graphql',
         json={
             'query': '''
 query {
@@ -80,5 +80,5 @@ query {
 
 def test_field_base_is_subclassed_with_invalid_name():
     with pytest.raises(RuntimeError):
-        class WrongSubclass(SchemaFieldBase):
+        class WrongSubclass(GraphQLField):
             key: str

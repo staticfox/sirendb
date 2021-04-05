@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections import OrderedDict
 import typing
 
@@ -5,54 +7,108 @@ import strawberry
 from strawberry.field import StrawberryField
 
 
+@strawberry.type
+class NullField:
+    ok: bool = strawberry.field(
+        description='This will be irrelevant at some point.'
+    )
+
+
+@strawberry.field(description='TODO')
+def null_query(self) -> NullField:
+    strawberry.field(description='TODO')
+    return NullField(ok=True)
+
+
 class SchemaFieldRegistry(type):
-    def __new__(meta: 'SchemaFieldRegistry', name: str, bases: tuple, namespce: typing.Dict[str, typing.Any]):
-        cls = type.__new__(meta, name, bases, namespce)
+    def __new__(meta: 'SchemaFieldRegistry', name: str, bases: tuple, namespace: typing.Dict[str, typing.Any]):
+        cls = type.__new__(meta, name, bases, namespace)
 
         if not hasattr(meta, 'registry'):
             meta.registry = {}
+
+        if not hasattr(meta, 'endpoints'):
+            meta.endpoints = set()
 
         if not bases:
             return cls
 
         if name not in ('Query', 'Mutation'):
             raise RuntimeError(
-                'You subclassed SchemaFieldBase but your class\'s name is neither\n'
-                'Query nor Mutation. Rename your class or remove SchemaFieldBase.'
+                'You subclassed GraphQLField but your class\'s name is neither\n'
+                'Query nor Mutation. Rename your class or remove GraphQLField.'
             )
 
-        meta.registry.setdefault(name, set()).add(cls)
-        meta.registry[name] -= set(bases)
+        if not getattr(cls, '__endpoints__', None):
+            raise RuntimeError(
+                'You subclassed GraphQLField but your class\'s does not specify\n'
+                'the endpoints it should be exposed to.\n'
+                'Make sure you add __endpoints__.'
+            )
+
+        meta.registry.setdefault(name, {})
+
+        for endpoint in cls.__endpoints__:
+            meta.endpoints.add(endpoint)
+            meta.registry[name].setdefault(endpoint, set())
+            meta.registry[name][endpoint].add(cls)
+            meta.registry[name][endpoint] -= set(bases)
 
         return cls
 
     @classmethod
-    def create_root_type(meta: 'SchemaFieldRegistry', type_name: str) -> typing.Type:
-        namespce = {}
-        namespce_class_map = {}
-        for Class in meta.registry.get(type_name, ()):
+    def create_root_type(meta: 'SchemaFieldRegistry', type_name: str, endpoint: str) -> typing.Optional[typing.Type]:
+        namespace = {}
+        namespace_class_map = {}
+        for Class in meta.registry.get(type_name, {}).get(endpoint, []):
             for attr_name, attr_value in Class.__dict__.items():
                 # FIXME: One glaring issue with this approach is that now resolvers may not
                 #        call member functions.
+                # print(f'{Class.__name__}.{attr_name} {attr_value=}')
                 if attr_name.startswith('_') or not isinstance(attr_value, StrawberryField):
                     continue
-                if attr_name in namespce:
+                if attr_name in namespace:
                     raise RuntimeError(
                         f'You tried to specify {Class.__module__}.{type_name}.{attr_name}\n'
-                        f'but it is already defined in {namespce_class_map[attr_name].__module__}.{type_name}.\n'
+                        f'but it is already defined in {namespace_class_map[attr_name].__module__}.{type_name}.\n'
                         'Remove or rename one of the entries.'
                     )
-                namespce[attr_name] = attr_value
-                namespce_class_map[attr_name] = Class
+                namespace[attr_name] = attr_value
+                namespace_class_map[attr_name] = Class
+
+        # Endpoint did not contain this type or vice versa
+        if not namespace:
+            return None
 
         # Alphabetically sort fields so they're easy to find
         # within the documentation.
-        namespce = OrderedDict(sorted(namespce.items()))
-        cls = type.__new__(type, type_name, (object,), namespce)
+        namespace = OrderedDict(sorted(namespace.items()))
+        cls = type.__new__(type, type_name, (object,), namespace)
         return strawberry.type(cls, description=(
             f'The root {type_name} object for interacting with SirenDB\'s GraphQL API.'
         ))
 
+    @classmethod
+    def schema_for_endpoint(meta: 'SchemaFieldRegistry') -> typing.Iterator[typing.Type]:
+        for endpoint in meta.endpoints:
+            schema_kwargs = {}
 
-class SchemaFieldBase(metaclass=SchemaFieldRegistry):
+            Query = meta.create_root_type('Query', endpoint)
+            if Query:
+                schema_kwargs['query'] = Query
+            else:
+                cls = type.__new__(type, 'Query', (object,), {
+                    '__endpoints__': (endpoint,),
+                    'null_query': null_query,
+                })
+                schema_kwargs['query'] = strawberry.type(cls, name='Query')
+
+            Mutation = meta.create_root_type('Mutation', endpoint)
+            if Mutation:
+                schema_kwargs['mutation'] = Mutation
+
+            yield endpoint, schema_kwargs
+
+
+class GraphQLField(metaclass=SchemaFieldRegistry):
     pass

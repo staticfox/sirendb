@@ -48,6 +48,8 @@ class SchemaTypeMeta(type):
         #   3) cls.Meta.sqlalchemy_model.__doc__
         description = namespace.get('__doc__')
 
+        cls_name = namespace.get('__typename__', cls_name)
+
         if 'Meta' in namespace:
             Meta = namespace['Meta']
 
@@ -126,9 +128,15 @@ class SchemaTypeMeta(type):
                 continue
             new_cls_namespce[key] = value
 
+        # GraphQL treats input types different from regular types.
+        if namespace.get('__isinput__') is True:
+            strawberry_type = strawberry.input
+        else:
+            strawberry_type = strawberry.type
+
         # Setup our Strawberry type so dataclass is happy.
         cls = type.__new__(meta, name, (object,), new_cls_namespce)
-        straberry_cls = strawberry.type(
+        straberry_cls = strawberry_type(
             cls,
             name=cls_name,
             description=description,
@@ -144,5 +152,5 @@ class SchemaTypeMeta(type):
         return straberry_cls
 
 
-class SchemaTypeBase(metaclass=SchemaTypeMeta):
+class GraphQLType(metaclass=SchemaTypeMeta):
     pass

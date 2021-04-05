@@ -38,7 +38,7 @@ def test_basic_login(client, db):
     db.session.commit()
 
     response = client.post(
-        '/api/v1/login',
+        '/api/v1/auth/login',
         data={
             'username': 'testuser',
             'password': 'v9fg4anu4VFDGa4a!',
@@ -61,7 +61,9 @@ def test_basic_login(client, db):
         }
     }
 
-    response = client.get('/api/v1/logout')
+    response = client.get(
+        '/api/v1/auth/logout',
+    )
     assert response.status_code == 200
     assert response.json == { 'ok': True }
 

@@ -9,7 +9,6 @@ import yaml
 from sirendb.core.auth import login_manager
 from sirendb.core.db import db
 from sirendb.core.strawberry import create_schema
-import sirendb.graphql
 from sirendb.v1 import auth_endpoints
 
 

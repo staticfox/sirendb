@@ -1,10 +1,10 @@
 from flask import make_response
 from flask_login import logout_user
 
-from . import auth_endpoints
+from .. import auth_endpoints
 
 
-@auth_endpoints.route('/api/v1/logout', methods=['GET'])
+@auth_endpoints.route('/api/v1/auth/logout', methods=['GET'])
 def logout():
     logout_user()
 

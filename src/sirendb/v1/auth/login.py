@@ -4,10 +4,10 @@ from werkzeug.security import check_password_hash
 
 from sirendb.models.user import User
 
-from . import auth_endpoints
+from .. import auth_endpoints
 
 
-@auth_endpoints.route('/api/v1/login', methods=['POST'])
+@auth_endpoints.route('/api/v1/auth/login', methods=['POST'])
 def login():
     username = request.form.get('username')
     password = request.form.get('password')

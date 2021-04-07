@@ -59,7 +59,7 @@ class Mutation(GraphQLField):
     def create_siren_system(self, form: Input) -> Output:
         kwargs = {
             k: getattr(form, k)
-            for k, v in form.__annotations__.items()
+            for k in form.__annotations__.keys()
         }
         siren_system = SirenSystem(**kwargs)
         siren_system.created_timestamp = datetime.utcnow()

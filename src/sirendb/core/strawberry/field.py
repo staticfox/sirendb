@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+import functools
+import inspect
 import typing
 
 import strawberry
 from strawberry.field import StrawberryField
+
+from .paginate import Paginated, Paginate
 
 
 @strawberry.type
@@ -20,10 +24,37 @@ def null_query(self) -> NullField:
     return NullField(ok=True)
 
 
+class PaginatedFieldMeta(type):
+    def __new__(meta, name, bases, namespace):
+        print(f'\n\nPaginatedFieldMeta: {meta=} {name=} {bases=} {namespace=}\n\n')
+        cls = type.__new__(meta, name, bases, namespace)
+        # strawberry_cls = strawberry.field(cls)
+        return cls
+
+
+class PaginatedField(metaclass=PaginatedFieldMeta):
+    def __init__(self, method):
+        print(f'\n\n PaginatedField: {self=}\n {method=}\n\n')
+        self.method = method
+        self.method_name = method.__name__
+        pass
+
+    def __call__(self, *args, **kwargs):
+        return self.method(*args, **kwargs)
+
+
+def paginated_field(func=None, node=None):
+    if func is None:
+        return functools.partial(paginated_field, node=node)
+
+    assert node
+    field = PaginatedField(func)
+    field.node = node
+    return field
+
+
 class SchemaFieldRegistry(type):
     def __new__(meta: 'SchemaFieldRegistry', name: str, bases: tuple, namespace: typing.Dict[str, typing.Any]):
-        cls = type.__new__(meta, name, bases, namespace)
-
         if not hasattr(meta, 'registry'):
             meta.registry = {}
 
@@ -31,7 +62,7 @@ class SchemaFieldRegistry(type):
             meta.endpoints = set()
 
         if not bases:
-            return cls
+            return type.__new__(meta, name, bases, namespace)
 
         if name not in ('Query', 'Mutation'):
             raise RuntimeError(
@@ -39,13 +70,46 @@ class SchemaFieldRegistry(type):
                 'Query nor Mutation. Rename your class or remove GraphQLField.'
             )
 
-        if not getattr(cls, '__endpoints__', None):
+        if not namespace.get('__endpoints__'):
             raise RuntimeError(
                 'You subclassed GraphQLField but your class\'s does not specify\n'
                 'the endpoints it should be exposed to.\n'
                 'Make sure you add __endpoints__.'
             )
 
+        for key, value in namespace.items():
+            if key.startswith('_'):
+                continue
+
+            # Convert this to a regular GraphQL field
+            if isinstance(value, PaginatedField):
+                sig = inspect.signature(value.method)
+
+                # Since Strawberry does not have any support for relays,
+                # we have to implement pagination ourselves. To make things
+                # simple to implement, we override the resolver's annotations
+                # as well as the resolver itself to implement pagination with
+                # dynamically created sorters via enums.
+                def paginated_request(*args, **kwargs):
+                    query = value.method(*args, **kwargs)
+                    return Paginated.paginate(query, **kwargs)
+
+                # Make the wrapper impersonate the actual resolver
+                paginated_request.__name__ = value.method_name
+                paginated_request.__annotations__ = {
+                    'paginate': typing.Optional[Paginate],
+                    'return': Paginated[value.node],
+                }
+                paginated_request.__signature__ = sig
+                # HACKHACK: Strawberry will try to resolve the paginated type's
+                #           python node. Since it's not defined within this scope,
+                #           we have to export it to prevent a NameError.
+                locals()[value.node.__name__] = value.node
+                namespace[value.method_name] = strawberry.field(
+                    paginated_request, description=value.method.__doc__
+                )
+
+        cls = type.__new__(meta, name, bases, namespace)
         meta.registry.setdefault(name, {})
 
         for endpoint in cls.__endpoints__:

@@ -2,14 +2,29 @@ from __future__ import annotations
 
 from collections import OrderedDict
 import inspect
-import typing
+from typing import (
+    Any,
+    Dict,
+    Iterator,
+    Optional,
+    Type,
+)
 
 import strawberry
 from strawberry.field import StrawberryField
 from strawberry.utils.str_converters import to_camel_case
 import sqlalchemy as sa
 
-from .paginate import Paginated, Paginate, PaginatedField, SortingEnum
+from .paginate import (
+    Paginate,
+    Paginated,
+    PaginatedField,
+    SortingEnum,
+)
+from .scalars import (
+    LimitedStringScalar,
+    StringLimitExceeded,
+)
 
 
 @strawberry.type
@@ -41,8 +56,75 @@ def decl_enum(node: GraphQLField) -> SortingEnum:
     return sorter
 
 
+def make_filters(node: GraphQLField) -> Dict[str, StrawberryField]:
+    filters = {}
+
+    sqlalchemy_only_fields = getattr(node.Meta, 'sqlalchemy_only_fields', [])
+
+    for column in node.Meta.sqlalchemy_model.__table__.columns:
+        if isinstance(column, sa.sql.schema.Column):
+            if sqlalchemy_only_fields and column.key not in sqlalchemy_only_fields:
+                continue
+
+            type_ = column.type.python_type
+            description = column.doc
+
+            # Allow the type itself to raise the GraphQL error
+            # instead of doing basic repetitive string size checks
+            # in every single resolver.
+            if column.type.python_type is str and column.type.length:
+                type_ = LimitedStringScalar
+                max_length = column.type.length
+
+                def parse_value(value, _max_length=max_length):
+                    if len(value) > _max_length:
+                        raise StringLimitExceeded
+                    return value
+
+            filters[column.key] = StrawberryField(**{
+                'python_name': column.key,
+                'graphql_name': column.key,
+                'type_': type_,
+                'is_optional': column.nullable,
+                'default_value': column.default,
+                'description': description,
+            })
+
+    return filters
+
+
+def make_filter(node: GraphQLField):
+    fields = make_filters(node)
+    cls_namespce = {
+        '__annotations__': {},
+    }
+
+    for field_name, field_value in fields.items():
+        cls_namespce['__annotations__'][field_name] = field_value.type
+        cls_namespce[field_name] = field_value
+
+    name = to_camel_case(node.Meta.sqlalchemy_model.__table__.name.capitalize())
+
+    # Setup our Strawberry type so dataclass is happy.
+    cls = type.__new__(type, name + 'Filter', (object,), cls_namespce)
+    straberry_cls = strawberry.input(
+        cls,
+        name=name + 'Filter',
+        description=f'Filters the collection of {node.Meta.name} objects.',
+    )
+
+    # Now that everything has been created properly, we can
+    # re-order the type definition so fields will be sent
+    # to GraphQL in alphabetical order.
+    straberry_cls._type_definition._fields = sorted(
+        straberry_cls._type_definition._fields,
+        key=lambda field: field.graphql_name
+    )
+    return straberry_cls
+
+
 class SchemaFieldRegistry(type):
-    def __new__(meta: 'SchemaFieldRegistry', name: str, bases: tuple, namespace: typing.Dict[str, typing.Any]):
+    def __new__(meta: 'SchemaFieldRegistry', name: str, bases: tuple, namespace: Dict[str, Any]):
         if not hasattr(meta, 'registry'):
             meta.registry = {}
 
@@ -76,6 +158,9 @@ class SchemaFieldRegistry(type):
                 # Generate an enum for order_by
                 sorting_enum = decl_enum(value.node)
 
+                # Generate search fields
+                filter_type = make_filter(value.node)
+
                 # Since Strawberry does not have any support for relays,
                 # we have to implement pagination ourselves. To make things
                 # simple to implement, we override the resolver's annotations
@@ -83,13 +168,17 @@ class SchemaFieldRegistry(type):
                 # dynamically created sorters via enums.
                 def paginated_request(*args, **kwargs):
                     query = value.method(*args, **kwargs)
-                    return Paginated.paginate(query, sorter=sorting_enum, **kwargs)
+                    if 'filter' in kwargs:
+                        kwargs['filter_'] = kwargs['filter']
+                        del kwargs['filter']
+                    return Paginated.paginate(query, sorter=sorting_enum, filter_type=filter_type, **kwargs)
 
                 # Make the wrapper impersonate the actual resolver
                 paginated_request.__name__ = value.method_name
                 paginated_request.__annotations__ = {
-                    'paginate': typing.Optional[Paginate],
-                    'sort': typing.Optional[sorting_enum.strawberry_enum],
+                    'paginate': Optional[Paginate],
+                    'filter': Optional[filter_type],
+                    'sort': Optional[sorting_enum.strawberry_enum],
                     'return': Paginated[value.node],
                 }
                 paginated_request.__signature__ = sig
@@ -113,7 +202,7 @@ class SchemaFieldRegistry(type):
         return cls
 
     @classmethod
-    def create_root_type(meta: 'SchemaFieldRegistry', type_name: str, endpoint: str) -> typing.Optional[typing.Type]:
+    def create_root_type(meta: 'SchemaFieldRegistry', type_name: str, endpoint: str) -> Optional[Type]:
         namespace = {}
         namespace_class_map = {}
         for Class in meta.registry.get(type_name, {}).get(endpoint, []):
@@ -145,7 +234,7 @@ class SchemaFieldRegistry(type):
         ))
 
     @classmethod
-    def schema_for_endpoint(meta: 'SchemaFieldRegistry') -> typing.Iterator[typing.Type]:
+    def schema_for_endpoint(meta: 'SchemaFieldRegistry') -> Iterator[Type]:
         for endpoint in meta.endpoints:
             schema_kwargs = {}
 

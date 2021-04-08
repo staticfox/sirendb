@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Any, Optional
 
 from sirendb.core.strawberry import GraphQLField
 from sirendb.core.strawberry.field import SortingEnum
@@ -13,7 +13,16 @@ class Query(GraphQLField):
     __endpoints__ = ('/api/v1/graphql',)
 
     @paginated_field(node=SirenSystemNode)
-    def siren_systems(self, paginate: Optional[Paginate] = None, sort: Optional[SortingEnum] = None):
+    def siren_systems(
+        self,
+        # Custom search
+        # geolocation: Optional[Tuple[float, float]],
+
+        # Provided by paginated_field
+        paginate: Optional[Paginate] = None,
+        sort: Optional[SortingEnum] = None,
+        filter: Optional[Any] = None,
+    ):
         '''
         Return siren systems.
         '''

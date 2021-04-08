@@ -4,11 +4,10 @@ from flask_sqlalchemy import Model
 import strawberry
 from strawberry.field import StrawberryField
 
-from .scalars import LimitedStringScalar
-
-
-class StringLimitExceeded(Exception):
-    pass
+from .scalars import (
+    LimitedStringScalar,
+    StringLimitExceeded,
+)
 
 
 def _extract_sqlalchemy_orm_columns(model: Model) -> typing.Dict[str, StrawberryField]:

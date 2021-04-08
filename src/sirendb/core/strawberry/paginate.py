@@ -2,18 +2,21 @@ from __future__ import annotations
 
 from enum import Enum
 import functools
+import re
 from typing import (
+    Any,
     Generic,
     List,
-    TypeVar,
     Optional,
+    TypeVar,
 )
 
+from graphql.error.graphql_error import GraphQLError
 import strawberry
 from strawberry.field import StrawberryField
 import sqlalchemy as sa
-from graphql.error.graphql_error import GraphQLError
 
+from .scalars import LimitedStringScalar
 from .type_ import GraphQLType
 
 
@@ -95,7 +98,6 @@ class SortingEnum:
         self.strawberry_enum = None
 
     def add(self, column, direction, enum_value):
-        # full_enum_value = enum_value + 'SortEnum'
         self.enum_to_column[enum_value] = {
             'column': column,
             'direction': direction,
@@ -114,6 +116,66 @@ class SortingEnum:
         return self.enum_to_column['ID_ASC']
 
 
+def wildcard_to_sql(value: str):
+    # TODO: tests tests tests
+    new_str = ''
+
+    for index, char in enumerate(value):
+        if index + 1 < len(value):
+            next_char = value[index + 1]
+        else:
+            next_char = None
+
+        if char == '*':
+            if next_char in ('*', '?'):
+                raise GraphQLError('invalid search expression')
+            new_str += '%'
+            continue
+
+        if char == '?' and next_char == '?':
+            raise GraphQLError('invalid search expression')
+
+        if re.compile(r'[^a-zA-Z0-9\%\*]').search(value):
+            raise GraphQLError('invalid search expression')
+        elif not re.compile(r'[a-zA-Z0-9]').search(value):
+            raise GraphQLError('invalid search expression')
+
+        new_str += char
+
+    return new_str
+
+
+def get_column_by_key(query, name: str):
+    for column in query._raw_columns[0].columns:
+        if column.key == name:
+            return column
+    assert False
+
+
+class SearchType:
+    def __init__(self):
+        self.invalid_message = None
+        self.match_any = None
+        self.match_one = False
+
+    @classmethod
+    def filter_by(self, query, name: str, value: Any, type_: type):
+        if type_ in (LimitedStringScalar, str):
+            expression = wildcard_to_sql(value)
+            if '%' in expression or '?' in expression:
+                column = get_column_by_key(query, name)
+                return query.filter(column.ilike(value))
+            else:
+                return query.filter_by(**{name: value})
+            assert False
+        elif isinstance(type_, bool):
+            column = get_column_by_key(query, name)
+            return query.filter(column.is_(value))
+        else:
+            return query.filter_by(**{name: value})
+        assert False
+
+
 @strawberry.type
 class Paginated(Generic[T]):
     items: List[T]
@@ -125,6 +187,8 @@ class Paginated(Generic[T]):
         cls,
         query: sa.orm.query.Query,
         paginate: Optional[Paginate],
+        filter_,  # TODO type
+        filter_type,  # TODO type
         sort: Optional[str],
         sorter: Optional[SortingEnum],
     ):
@@ -154,6 +218,12 @@ class Paginated(Generic[T]):
             raise GraphQLError('before and after may not be specified at the same time.')
 
         # query = query.distinct()
+
+        if filter_:
+            for field_name, field_type in filter_.__annotations__.items():
+                field_value = filter_.__dict__[field_name]
+                if field_value is not None:
+                    query = SearchType.filter_by(query, field_name, field_value, field_type)
 
         if sorting_enum:
             order_by = getattr(sorting_enum['column'], sorting_enum['direction'])()

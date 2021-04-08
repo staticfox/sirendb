@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-import functools
 import inspect
 import typing
 
 import strawberry
 from strawberry.field import StrawberryField
+from strawberry.utils.str_converters import to_camel_case
+import sqlalchemy as sa
 
-from .paginate import Paginated, Paginate
+from .paginate import Paginated, Paginate, PaginatedField, SortingEnum
 
 
 @strawberry.type
@@ -24,33 +25,20 @@ def null_query(self) -> NullField:
     return NullField(ok=True)
 
 
-class PaginatedFieldMeta(type):
-    def __new__(meta, name, bases, namespace):
-        print(f'\n\nPaginatedFieldMeta: {meta=} {name=} {bases=} {namespace=}\n\n')
-        cls = type.__new__(meta, name, bases, namespace)
-        # strawberry_cls = strawberry.field(cls)
-        return cls
+def decl_enum(node: GraphQLField) -> SortingEnum:
+    sorter = SortingEnum()
 
+    for column in node.Meta.sqlalchemy_model.__table__.columns:
+        if isinstance(column, sa.sql.schema.Column):
+            key = column.key.upper()
 
-class PaginatedField(metaclass=PaginatedFieldMeta):
-    def __init__(self, method):
-        print(f'\n\n PaginatedField: {self=}\n {method=}\n\n')
-        self.method = method
-        self.method_name = method.__name__
-        pass
+            for direction in ('_ASC', '_DESC'):
+                enum_value = key + direction
+                sorter.add(column=column, direction=direction[1:].lower(), enum_value=enum_value)
 
-    def __call__(self, *args, **kwargs):
-        return self.method(*args, **kwargs)
-
-
-def paginated_field(func=None, node=None):
-    if func is None:
-        return functools.partial(paginated_field, node=node)
-
-    assert node
-    field = PaginatedField(func)
-    field.node = node
-    return field
+    enum_name = to_camel_case(node.Meta.sqlalchemy_model.__table__.name.capitalize())
+    sorter.make_enum(enum_name)
+    return sorter
 
 
 class SchemaFieldRegistry(type):
@@ -85,6 +73,9 @@ class SchemaFieldRegistry(type):
             if isinstance(value, PaginatedField):
                 sig = inspect.signature(value.method)
 
+                # Generate an enum for order_by
+                sorting_enum = decl_enum(value.node)
+
                 # Since Strawberry does not have any support for relays,
                 # we have to implement pagination ourselves. To make things
                 # simple to implement, we override the resolver's annotations
@@ -92,12 +83,13 @@ class SchemaFieldRegistry(type):
                 # dynamically created sorters via enums.
                 def paginated_request(*args, **kwargs):
                     query = value.method(*args, **kwargs)
-                    return Paginated.paginate(query, **kwargs)
+                    return Paginated.paginate(query, sorter=sorting_enum, **kwargs)
 
                 # Make the wrapper impersonate the actual resolver
                 paginated_request.__name__ = value.method_name
                 paginated_request.__annotations__ = {
                     'paginate': typing.Optional[Paginate],
+                    'sort': typing.Optional[sorting_enum.strawberry_enum],
                     'return': Paginated[value.node],
                 }
                 paginated_request.__signature__ = sig

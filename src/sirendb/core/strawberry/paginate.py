@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+from enum import Enum
+import functools
 from typing import (
     Generic,
     List,
@@ -12,6 +15,26 @@ import sqlalchemy as sa
 from graphql.error.graphql_error import GraphQLError
 
 from .type_ import GraphQLType
+
+
+class PaginatedField:
+    def __init__(self, method):
+        self.method = method
+        self.method_name = method.__name__
+
+    def __call__(self, *args, **kwargs):
+        return self.method(*args, **kwargs)
+
+
+def paginated_field(func=None, node=None):
+    if func is None:
+        return functools.partial(paginated_field, node=node)
+
+    assert node
+
+    field = PaginatedField(func)
+    field.node = node
+    return field
 
 
 @strawberry.type
@@ -66,8 +89,30 @@ class Paginate(GraphQLType):
 T = TypeVar("T")
 
 
-class GenericSorter(Generic[T]):
-    pass
+class SortingEnum:
+    def __init__(self):
+        self.enum_to_column = {}
+        self.enum = None
+        self.strawberry_enum = None
+
+    def add(self, column, direction, enum_value):
+        # full_enum_value = enum_value + 'SortEnum'
+        self.enum_to_column[enum_value] = {
+            'column': column,
+            'direction': direction,
+            'enum_value': enum_value,
+        }
+
+    def make_enum(self, name: str):
+        self.enum = Enum(name + 'SortEnum', ' '.join([
+            value['enum_value']
+            for value in self.enum_to_column.values()
+        ]))
+        self.strawberry_enum = strawberry.enum(self.enum)
+
+    def get_default(self):
+        # TODO: Pick based on primary key
+        return self.enum_to_column['ID_ASC']
 
 
 @strawberry.type
@@ -77,8 +122,18 @@ class Paginated(Generic[T]):
     page_info: PageInfo = None
 
     @classmethod
-    def paginate(cls, query: sa.orm.query.Query, paginate: Paginate):
-        # print(f'Paginate\n{paginate=}')
+    def paginate(
+        cls,
+        query: sa.orm.query.Query,
+        paginate: Optional[Paginate],
+        sort: Optional[str],
+        sorter: Optional[SortingEnum],
+    ):
+        if sort:
+            sorting_enum = sorter.enum_to_column.get(sort.name)
+        else:
+            sorting_enum = sorter.get_default()
+
         if not paginate:
             paginate = Paginate(
                 first=10,
@@ -87,31 +142,29 @@ class Paginated(Generic[T]):
                 after=None,
             )
 
-        first = paginate.first
-        last = paginate.last
-        before = paginate.before
-        after = paginate.after
-
-        if first is not None and first < 0:
+        if paginate.first is not None and paginate.first < 0:
             raise GraphQLError('first may not be less than 0')
 
-        if last is not None and last < 0:
+        if paginate.last is not None and paginate.last < 0:
             raise GraphQLError('last may not be less than 0')
 
-        if first and last:
+        if paginate.first and paginate.last:
             raise GraphQLError('first and last may not be specified at the same time.')
 
-        if before and after:
+        if paginate.before and paginate.after:
             raise GraphQLError('before and after may not be specified at the same time.')
 
         # query = query.distinct()
 
-        # ORDER BY?
-        if first is not None:
-            query = query.limit(first)  # .order_by(SirenSystem.id.asc())
+        if sorting_enum:
+            order_by = getattr(sorting_enum['column'], sorting_enum['direction'])()
+            query = query.order_by(order_by)
+
+        if paginate.first is not None:
+            query = query.limit(paginate.first)
         else:
-            assert last is not None
-            query = query.limit(last)  # .order_by(SirenSystem.id.desc())
+            assert paginate.last is not None
+            query = query.limit(paginate.last)
 
         data = query.all()
 

@@ -9,8 +9,8 @@ pytest_plugins = (
 
 
 LIST_QUERY = '''
-query listSystems($paginate: Paginate) {
-  sirenSystems(paginate: $paginate) {
+query listSystems($paginate: Paginate, $sort: SirenSystemsSortEnum) {
+  sirenSystems(paginate: $paginate, sort: $sort) {
     count
     pageInfo {
       hasNext
@@ -77,6 +77,32 @@ def test_list_siren_system(app, user_client, db):
                     'lastCursor': ''
                 },
                 'items': []
+            }
+        }
+    }
+
+    response = client.post(
+        '/api/v1/graphql',
+        json={
+            'query': LIST_QUERY,
+            'operationName': 'listSystems',
+            'variables': {
+                'sort': 'ID_ASC'
+            }
+        }
+    )
+    assert response.status_code == 200
+    assert response.json == {
+        'data': {
+            'sirenSystems': {
+                'count': 1,
+                'pageInfo': {
+                    'hasNext': False,
+                    'lastCursor': ''
+                },
+                'items': [{
+                    'name': 'Test Siren System'
+                }]
             }
         }
     }

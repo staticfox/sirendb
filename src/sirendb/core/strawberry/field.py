@@ -79,6 +79,11 @@ def make_filters(node: GraphQLField) -> Dict[str, StrawberryField]:
                 type_ = LimitedStringScalar
                 max_length = column.type.length
 
+                # So people are aware when they read the docs.
+                if description is None:
+                    description = ''
+                description += f' String size may not exceed {max_length} characters.'
+
                 def parse_value(value, _max_length=max_length):
                     if len(value) > _max_length:
                         raise StringLimitExceeded

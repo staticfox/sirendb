@@ -22,6 +22,8 @@ def _extract_sqlalchemy_orm_columns(model: Model) -> typing.Dict[str, Strawberry
     for column in table.columns:
         type_ = column.type.python_type
         description = column.doc
+        if description is not None:
+            description = description.strip().rstrip()
 
         # Allow the type itself to raise the GraphQL error
         # instead of doing basic repetitive string size checks
@@ -38,9 +40,9 @@ def _extract_sqlalchemy_orm_columns(model: Model) -> typing.Dict[str, Strawberry
             type_._scalar_definition.parse_value = parse_value
 
             # So people are aware when they read the docs.
-            if description:
-                description += ' '
-            description += f'String size may not exceed {max_length} characters.'
+            if description is None:
+                description = ''
+            description += f' String size may not exceed {max_length} characters.'
 
         fields[column.key] = StrawberryField(**{
             'python_name': column.key,

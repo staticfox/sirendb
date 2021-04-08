@@ -71,6 +71,8 @@ def make_filters(node: GraphQLField) -> Dict[str, StrawberryField]:
 
             type_ = column.type.python_type
             description = column.doc
+            if description is not None:
+                description = description.strip().rstrip()
 
             # Allow the type itself to raise the GraphQL error
             # instead of doing basic repetitive string size checks
@@ -194,8 +196,11 @@ class SchemaFieldRegistry(type):
                 #           python node. Since it's not defined within this scope,
                 #           we have to export it to prevent a NameError.
                 locals()[value.node.__name__] = value.node
+                description = value.method.__doc__
+                if description is not None:
+                    description = description.strip().rstrip()
                 namespace[value.method_name] = strawberry.field(
-                    paginated_request, description=value.method.__doc__
+                    paginated_request, description=description
                 )
 
         cls = type.__new__(meta, name, bases, namespace)

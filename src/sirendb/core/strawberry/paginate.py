@@ -18,9 +18,10 @@ from .type_ import GraphQLType
 
 
 class PaginatedField:
-    def __init__(self, method):
+    def __init__(self, method, node):
         self.method = method
         self.method_name = method.__name__
+        self.node = node
 
     def __call__(self, *args, **kwargs):
         return self.method(*args, **kwargs)
@@ -32,9 +33,7 @@ def paginated_field(func=None, node=None):
 
     assert node
 
-    field = PaginatedField(func)
-    field.node = node
-    return field
+    return PaginatedField(func, node)
 
 
 @strawberry.type

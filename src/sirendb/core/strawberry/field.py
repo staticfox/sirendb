@@ -66,6 +66,9 @@ def make_filters(node: GraphQLField) -> Dict[str, StrawberryField]:
             if sqlalchemy_only_fields and column.key not in sqlalchemy_only_fields:
                 continue
 
+            if column.type.python_type not in (str, LimitedStringScalar, bool, int):
+                continue
+
             type_ = column.type.python_type
             description = column.doc
 

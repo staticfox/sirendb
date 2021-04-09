@@ -1,3 +1,5 @@
+from typing import Any, Optional
+
 import pytest
 import strawberry
 
@@ -6,11 +8,13 @@ from sirendb.core.strawberry import (
     GraphQLField,
     GraphQLType,
 )
+from sirendb.core.strawberry.field import SortingEnum
+from sirendb.core.strawberry.paginate import Paginate, paginated_field
 
 
-class TableOne(db.Model):
+class ExampleTable(db.Model):
     '''
-    This is from TableOne's field
+    This is from ExampleTable's field
     '''
     __tablename__ = 'test_table_1'
 
@@ -33,11 +37,12 @@ class TableOne(db.Model):
     )
 
 
-class TableOneNode(GraphQLType):
+class ExampleTableNode(GraphQLType):
     class Meta:
-        name = 'TableOne'
-        sqlalchemy_model = TableOne
+        name = 'ExampleTable'
+        sqlalchemy_model = ExampleTable
         sqlalchemy_only_fields = (
+            'id',
             'email',
         )
 
@@ -45,16 +50,37 @@ class TableOneNode(GraphQLType):
         description='This was mounted directly'
     )
 
+    @staticmethod
+    def resolve_direct_field(row, *args, **kwargs):
+        return 'this is from the resolver'
+
 
 class Query(GraphQLField):
     __endpoints__ = ('/api/v1/test-graphql',)
 
     @strawberry.field(description='OwO Whats this?')
-    def get_table_one(self) -> TableOneNode:
-        return TableOneNode(
+    def get_table_one(self) -> ExampleTableNode:
+        return ExampleTableNode(
+            id=1,
             email='test email',
             direct_field='test 123',
         )
+
+    @paginated_field(node=ExampleTableNode)
+    def all_tables(
+        self,
+        # Custom search
+        # geolocation: Optional[Tuple[float, float]],
+
+        # Provided by paginated_field
+        paginate: Optional[Paginate] = None,
+        sort: Optional[SortingEnum] = None,
+        filter: Optional[Any] = None,
+    ):
+        '''
+        Return all tables.
+        '''
+        return ExampleTable.query
 
 
 @pytest.fixture

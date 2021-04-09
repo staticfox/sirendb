@@ -44,6 +44,9 @@ def decl_enum(node: GraphQLField) -> SortingEnum:
 
     for column in node.Meta.sqlalchemy_model.__table__.columns:
         if isinstance(column, sa.sql.schema.Column):
+            if not column.primary_key and column.key not in node.Meta.sqlalchemy_only_fields:
+                continue
+
             key = column.key.upper()
 
             for direction in ('_ASC', '_DESC'):
@@ -179,7 +182,14 @@ class SchemaFieldRegistry(type):
                     if 'filter' in kwargs:
                         kwargs['filter_'] = kwargs['filter']
                         del kwargs['filter']
-                    return Paginated.paginate(query, sorter=sorting_enum, filter_type=filter_type, **kwargs)
+
+                    return Paginated.paginate(
+                        query,
+                        _node=value.node,
+                        sorter=sorting_enum,
+                        filter_type=filter_type,
+                        **kwargs,
+                    )
 
                 # Make the wrapper impersonate the actual resolver
                 paginated_request.__name__ = value.method_name

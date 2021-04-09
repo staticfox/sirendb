@@ -186,6 +186,7 @@ class Paginated(Generic[T]):
     def paginate(
         cls,
         query: sa.orm.query.Query,
+        _node,  # TODO type
         paginate: Optional[Paginate],
         filter_,  # TODO type
         filter_type,  # TODO type
@@ -235,7 +236,27 @@ class Paginated(Generic[T]):
             assert paginate.last is not None
             query = query.limit(paginate.last)
 
-        data = query.all()
+        keys_with_resolvers = {}
+        keys_without_resolvers = set()
+
+        for field in _node._type_definition.fields:
+            resolver_name = f'resolve_{field.name}'
+            if resolver_name in _node.__dict__:
+                keys_with_resolvers[field.name] = getattr(_node, resolver_name)
+            else:
+                keys_without_resolvers.add(field.name)
+
+        data = []
+        for result in query.all():
+            dataclass_kwargs = {}
+
+            for key in keys_without_resolvers:
+                dataclass_kwargs[key] = getattr(result, key)
+
+            for key, resolver in keys_with_resolvers.items():
+                dataclass_kwargs[key] = resolver(result)
+
+            data.append(_node(**dataclass_kwargs))
 
         return cls(
             items=data,

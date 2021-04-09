@@ -9,7 +9,7 @@ pytest_plugins = (
 
 
 LIST_QUERY = '''
-query listSystems($paginate: Paginate, $sort: SirenSystemsSortEnum, $filter: SirenSystemsFilter) {
+query listSystems($paginate: Paginate, $sort: SirenSystemSortEnum, $filter: SirenSystemFilter) {
   sirenSystems(paginate: $paginate, sort: $sort, filter: $filter) {
     count
     pageInfo {

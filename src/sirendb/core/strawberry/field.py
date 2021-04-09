@@ -12,7 +12,6 @@ from typing import (
 
 import strawberry
 from strawberry.field import StrawberryField
-from strawberry.utils.str_converters import to_camel_case
 import sqlalchemy as sa
 
 from .paginate import (
@@ -51,8 +50,7 @@ def decl_enum(node: GraphQLField) -> SortingEnum:
                 enum_value = key + direction
                 sorter.add(column=column, direction=direction[1:].lower(), enum_value=enum_value)
 
-    enum_name = to_camel_case(node.Meta.sqlalchemy_model.__table__.name.capitalize())
-    sorter.make_enum(enum_name)
+    sorter.make_enum(node.Meta.name)
     return sorter
 
 
@@ -113,13 +111,13 @@ def make_filter(node: GraphQLField):
         cls_namespce['__annotations__'][field_name] = field_value.type
         cls_namespce[field_name] = field_value
 
-    name = to_camel_case(node.Meta.sqlalchemy_model.__table__.name.capitalize())
+    name = node.Meta.name + 'Filter'
 
     # Setup our Strawberry type so dataclass is happy.
-    cls = type.__new__(type, name + 'Filter', (object,), cls_namespce)
+    cls = type.__new__(type, name, (object,), cls_namespce)
     straberry_cls = strawberry.input(
         cls,
-        name=name + 'Filter',
+        name=name,
         description=f'Filters the collection of {node.Meta.name} objects.',
     )
 

@@ -63,35 +63,35 @@ class SirenSystem(db.Model):
         db.String(50),
         default=None,
         doc=(
-            'Name of the city that the system is designated form.'
+            'Name of the city that the system is designated for.'
         )
     )
     county = db.Column(
         db.String(50),
         default=None,
         doc=(
-            'Name of the county that the system is designated form.'
+            'Name of the county that the system is designated for.'
         )
     )
     state = db.Column(
         db.String(50),
         default=None,
         doc=(
-            'Name of the state that the system is designated form.'
+            'Name of the state that the system is designated for.'
         )
     )
     country = db.Column(
         db.String(50),
         default=None,
         doc=(
-            'Name of the country that the system is designated form.'
+            'Name of the country that the system is designated for.'
         )
     )
     postal_code = db.Column(
         db.String(20),
         default=None,
         doc=(
-            'Postal code that the system is designated form.'
+            'Postal code that the system is designated for.'
         )
     )
     siren_wiki_url = db.Column(

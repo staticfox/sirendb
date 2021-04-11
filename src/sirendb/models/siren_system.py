@@ -5,7 +5,7 @@ class SirenSystem(db.Model):
     '''
     Describes a collection of sirens that are managed by a local government or agency.
     '''
-    __tablename__ = 'sirens'
+    __tablename__ = 'siren_systems'
 
     id = db.Column(
         db.Integer,

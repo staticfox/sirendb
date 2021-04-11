@@ -21,11 +21,11 @@ def test_table_one_object_is_mapped_correctly(client, introspection_graphql_quer
     types = response.json.get('data', {}).get('__schema', {}).get('types', [])
     table_one = None
     for type_ in types:
-        if type_['kind'] == 'OBJECT' and type_['name'] == 'TableOne':
+        if type_['kind'] == 'OBJECT' and type_['name'] == 'ExampleTable':
             table_one = type_
             break
     assert table_one is not None
-    assert table_one['description'] == "This is from TableOne's field"
+    assert table_one['description'] == "This is from ExampleTable's field"
 
     fields = {
         'directField': {
@@ -40,10 +40,16 @@ def test_table_one_object_is_mapped_correctly(client, introspection_graphql_quer
             'deprecationReason': None,
             'nullable': True,
         },
+        'id': {
+            'description': 'Identifies the primary key from the database.',
+            'isDeprecated': False,
+            'deprecationReason': None,
+            'nullable': False,
+        }
     }
     field_names = [k['name'] for k in table_one['fields']]
 
-    assert field_names == ['directField', 'email']
+    assert field_names == ['directField', 'email', 'id']
 
     for field in table_one['fields']:
         field_def = fields[field['name']]

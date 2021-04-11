@@ -21,6 +21,7 @@ def app():
             'SQLALCHEMY_DATABASE_URI': DBFixtureNotIncluded,
             'SQLALCHEMY_TRACK_MODIFICATIONS': False,
             'SECRET_KEY': secrets.token_hex(24),
+            # 'SQLALCHEMY_ECHO': True,
         }
     )
     yield app

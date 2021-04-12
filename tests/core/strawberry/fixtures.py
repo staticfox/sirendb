@@ -12,6 +12,29 @@ from sirendb.core.strawberry.field import SortingEnum
 from sirendb.core.strawberry.paginate import Paginate, paginated_field
 
 
+class Book(db.Model):
+    '''
+    This describes a book.
+    '''
+    __tablename__ = 'test_book_1'
+
+    id = db.Column(
+        db.Integer,
+        primary_key=True,
+        doc='Identifies the primary key from the database.',
+    )
+    name = db.Column(
+        db.String,
+        nullable=False,
+        doc='This is a book name.',
+    )
+    table_id = db.Column(
+        db.Integer,
+        db.ForeignKey('test_table_1.id'),
+        nullable=False,
+    )
+
+
 class ExampleTable(db.Model):
     '''
     This is from ExampleTable's field
@@ -35,6 +58,11 @@ class ExampleTable(db.Model):
         default=None,
         doc='This can be null though.'
     )
+    books = db.relationship(
+        'Book',
+        uselist=True,
+        doc='List of books that belong to this table.',
+    )
 
 
 class ExampleTableNode(GraphQLType):
@@ -44,6 +72,7 @@ class ExampleTableNode(GraphQLType):
         sqlalchemy_only_fields = (
             'id',
             'email',
+            # 'books',
         )
 
     direct_field: str = strawberry.field(

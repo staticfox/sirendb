@@ -1,16 +1,14 @@
-import strawberry
+from sirendb.core.strawberry import GraphQLType
+from sirendb.models.siren import Siren
 
 
-@strawberry.type(
-    name='Siren',
-    description=(
-        'Describes the attributes of an outdoor warning siren.'
-    )
-)
-class Siren:
-    '''
-    Siren description here
-    '''
-    name: str = strawberry.field(
-        description='The name of the siren'
-    )
+class SirenNode(GraphQLType):
+    class Meta:
+        name = 'Siren'
+        sqlalchemy_model = Siren
+        sqlalchemy_only_fields = (
+            'id',
+            'active',
+            'model',
+            # 'locations',
+        )

@@ -1,16 +1,82 @@
+import inspect
 import typing
 
 from flask_sqlalchemy import Model
 import strawberry
 from strawberry.field import StrawberryField
+from strawberry.types.types import TypeDefinition
+from sqlalchemy.sql.schema import Column
+from sqlalchemy import inspect as sql_inspect
+from sqlalchemy.orm.relationships import RelationshipProperty
 
+from .paginated_fields import paginated_fields
 from .scalars import (
     LimitedStringScalar,
     StringLimitExceeded,
 )
 
 
-def _extract_sqlalchemy_orm_columns(model: Model) -> typing.Dict[str, StrawberryField]:
+table_to_type = {}
+
+
+def _column_to_field(column: Column) -> StrawberryField:
+    type_ = column.type.python_type
+    description = column.doc
+    if description is not None:
+        description = description.strip().rstrip()
+
+    # Allow the type itself to raise the GraphQL error
+    # instead of doing basic repetitive string size checks
+    # in every single resolver.
+    if column.type.python_type is str and column.type.length:
+        type_ = LimitedStringScalar
+        max_length = column.type.length
+
+        def parse_value(value, _max_length=max_length):
+            if len(value) > _max_length:
+                raise StringLimitExceeded
+            return value
+
+        type_._scalar_definition.parse_value = parse_value
+
+        # So people are aware when they read the docs.
+        if description is None:
+            description = ''
+        description += f' String size may not exceed {max_length} characters.'
+
+    return StrawberryField(**{
+        'python_name': column.key,
+        'graphql_name': column.key,
+        'type_': type_,
+        'is_optional': column.nullable,
+        'default_value': column.default,
+        'description': description,
+    })
+
+
+def _relationship_to_field(relationship: RelationshipProperty):
+    if relationship.target.name not in table_to_type:
+        raise RuntimeError(
+            f'_relationship_to_field called for {relationship.target.name} '
+            'but it was not in the type table.'
+        )
+
+    type_ = table_to_type[relationship.target.name]
+    if relationship.uselist:
+        # FIXME what do???
+        return StrawberryField(**{
+            'python_name': relationship.key,
+            'graphql_name': type_._type_definition.name,
+            'type_': [type_],
+            'is_optional': False,
+            'default_value': [],
+            'description': 'Collection of objects.',
+            'is_list': True,
+        })
+    return type_
+
+
+def _extract_sqlalchemy_orm_columns(model: Model, only_fields: typing.Tuple[str] = ()) -> typing.Dict[str, StrawberryField]:
     fields = {}
 
     if not issubclass(model, Model):
@@ -20,38 +86,15 @@ def _extract_sqlalchemy_orm_columns(model: Model) -> typing.Dict[str, Strawberry
 
     table = model.__dict__['__table__']
     for column in table.columns:
-        type_ = column.type.python_type
-        description = column.doc
-        if description is not None:
-            description = description.strip().rstrip()
+        if only_fields and column.key not in only_fields:
+            continue
+        fields[column.key] = _column_to_field(column)
 
-        # Allow the type itself to raise the GraphQL error
-        # instead of doing basic repetitive string size checks
-        # in every single resolver.
-        if column.type.python_type is str and column.type.length:
-            type_ = LimitedStringScalar
-            max_length = column.type.length
-
-            def parse_value(value, _max_length=max_length):
-                if len(value) > _max_length:
-                    raise StringLimitExceeded
-                return value
-
-            type_._scalar_definition.parse_value = parse_value
-
-            # So people are aware when they read the docs.
-            if description is None:
-                description = ''
-            description += f' String size may not exceed {max_length} characters.'
-
-        fields[column.key] = StrawberryField(**{
-            'python_name': column.key,
-            'graphql_name': column.key,
-            'type_': type_,
-            'is_optional': column.nullable,
-            'default_value': column.default,
-            'description': description,
-        })
+    mapper = sql_inspect(model)
+    for relationship in mapper.relationships:
+        if only_fields and not relationship.key in only_fields:
+            continue
+        fields[relationship.key] = _relationship_to_field(relationship)
 
     return fields
 
@@ -79,6 +122,7 @@ class SchemaTypeMeta(type):
         description = namespace.get('__doc__')
 
         cls_name = namespace.get('__typename__', cls_name)
+        sqlalchemy_model = None
 
         if 'Meta' in namespace:
             Meta = namespace['Meta']
@@ -87,16 +131,21 @@ class SchemaTypeMeta(type):
                 cls_name = Meta.name
 
             if hasattr(Meta, 'sqlalchemy_model'):
-                fields = _extract_sqlalchemy_orm_columns(Meta.sqlalchemy_model)
+                sqlalchemy_model = Meta.sqlalchemy_model
                 only_fields = getattr(Meta, 'sqlalchemy_only_fields', ())
+                fields = _extract_sqlalchemy_orm_columns(sqlalchemy_model, only_fields)
                 for field_name, field_value in fields.items():
-                    if field_name in cls_namespce or field_name not in only_fields:
+                    if field_name in cls_namespce:
                         continue
 
-                    cls_namespce['__annotations__'][field_name] = field_value.type
+                    if hasattr(field_value, 'type'):
+                        cls_namespce['__annotations__'][field_name] = field_value.type
+                    else:
+                        cls_namespce['__annotations__'][field_name] = field_value
+
                     cls_namespce[field_name] = field_value
 
-                model_doc = Meta.sqlalchemy_model.__dict__.get('__doc__')
+                model_doc = sqlalchemy_model.__dict__.get('__doc__')
                 if model_doc and not description:
                     description = model_doc
 
@@ -130,14 +179,19 @@ class SchemaTypeMeta(type):
         with_default = []
 
         for field_name, field_value in cls_namespce.items():
-            if not isinstance(field_value, StrawberryField):
+            if inspect.isclass(field_value):
+                type_def = getattr(field_value, '_type_definition', None)
+                if not isinstance(type_def, TypeDefinition) and not issubclass(field_value, StrawberryField):
+                    continue
+            elif not isinstance(field_value, StrawberryField):
                 continue
 
-            if field_value.default_value:
+            if getattr(field_value, 'default_value', None):
                 with_default.append((field_name, field_value))
             else:
                 without_default.append((field_name, field_value))
 
+        # print(f'{with_default=} {without_default=}')
         # without_default.sort(key=lambda pair: pair[0])
         # with_default.sort(key=lambda pair: pair[0])
 
@@ -190,6 +244,9 @@ class SchemaTypeMeta(type):
             straberry_cls._type_definition._fields,
             key=lambda field: field.graphql_name
         )
+        if sqlalchemy_model:
+            table_to_type[sqlalchemy_model.__table__.name] = straberry_cls
+
         return straberry_cls
 
 

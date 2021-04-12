@@ -9,7 +9,7 @@ from sqlalchemy.sql.schema import Column
 from sqlalchemy import inspect as sql_inspect
 from sqlalchemy.orm.relationships import RelationshipProperty
 
-from .paginated_fields import paginated_fields
+# from .paginated_fields import paginated_fields
 from .scalars import (
     LimitedStringScalar,
     StringLimitExceeded,
@@ -76,7 +76,10 @@ def _relationship_to_field(relationship: RelationshipProperty):
     return type_
 
 
-def _extract_sqlalchemy_orm_columns(model: Model, only_fields: typing.Tuple[str] = ()) -> typing.Dict[str, StrawberryField]:
+def _extract_sqlalchemy_orm_columns(
+    model: Model,
+    only_fields: typing.Tuple[str] = (),
+) -> typing.Dict[str, StrawberryField]:
     fields = {}
 
     if not issubclass(model, Model):
@@ -92,7 +95,7 @@ def _extract_sqlalchemy_orm_columns(model: Model, only_fields: typing.Tuple[str]
 
     mapper = sql_inspect(model)
     for relationship in mapper.relationships:
-        if only_fields and not relationship.key in only_fields:
+        if only_fields and relationship.key not in only_fields:
             continue
         fields[relationship.key] = _relationship_to_field(relationship)
 

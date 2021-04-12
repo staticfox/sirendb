@@ -1,7 +1,7 @@
 from sirendb.core.db import db
 
-from .siren_location import SirenLocation
-from .siren_model import SirenModel
+from .siren_location import SirenLocation  # noqa
+from .siren_model import SirenModel  # noqa
 
 
 class Siren(db.Model):

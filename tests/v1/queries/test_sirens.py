@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from sirendb.models.siren import Siren
 from sirendb.models.siren_model import SirenModel
 

@@ -28,6 +28,12 @@ def test_table_one_object_is_mapped_correctly(client, introspection_graphql_quer
     assert table_one['description'] == "This is from ExampleTable's field"
 
     fields = {
+        'books': {
+            'description': 'List of books that belong to this table.',
+            'isDeprecated': False,
+            'deprecationReason': None,
+            'nullable': False,
+        },
         'directField': {
             'description': 'This was mounted directly',
             'isDeprecated': False,
@@ -49,7 +55,7 @@ def test_table_one_object_is_mapped_correctly(client, introspection_graphql_quer
     }
     field_names = [k['name'] for k in table_one['fields']]
 
-    assert field_names == ['directField', 'email', 'id']
+    assert field_names == ['books', 'directField', 'email', 'id']
 
     for field in table_one['fields']:
         field_def = fields[field['name']]

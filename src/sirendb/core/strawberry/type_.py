@@ -1,3 +1,4 @@
+from dataclasses import MISSING
 import inspect
 import typing
 
@@ -62,9 +63,26 @@ def _relationship_to_field(relationship: RelationshipProperty):
         )
 
     type_ = table_to_type[relationship.target.name]
+    field_kwargs = {
+        'python_name': relationship.key,
+        'graphql_name': relationship.key,
+        'child': type_,
+        'description': relationship.doc,
+    }
     if relationship.uselist:
-        return typing.List[type_]
-    return type_
+        field_kwargs.update({
+            'is_list': True,
+            'is_optional': False,
+            'default_value': [],
+            'type_': typing.List[type_],
+        })
+    else:
+        field_kwargs.update({
+            'is_list': False,
+            'is_optional': any([c.nullable for c in relationship.local_columns]),
+            'type_': type_,
+        })
+    return StrawberryField(**field_kwargs)
 
 
 def _extract_sqlalchemy_orm_columns(
@@ -192,10 +210,13 @@ class SchemaTypeMeta(type):
             if not is_valid_field(field_value):
                 continue
 
-            if getattr(field_value, 'default_value', None):
-                with_default.append((field_name, field_value))
-            else:
+            default = getattr(field_value, 'default', None)
+            default_factory = getattr(field_value, 'default_factory', None)
+
+            if default is MISSING and default_factory is MISSING:
                 without_default.append((field_name, field_value))
+            else:
+                with_default.append((field_name, field_value))
 
         # print(f'{with_default=} {without_default=}')
         # without_default.sort(key=lambda pair: pair[0])

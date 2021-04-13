@@ -65,6 +65,16 @@ class ExampleTable(db.Model):
     )
 
 
+class BookNode(GraphQLType):
+    class Meta:
+        name = 'Book'
+        sqlalchemy_model = Book
+        sqlalchemy_only_fields = (
+            'id',
+            'name',
+        )
+
+
 class ExampleTableNode(GraphQLType):
     class Meta:
         name = 'ExampleTable'
@@ -72,7 +82,7 @@ class ExampleTableNode(GraphQLType):
         sqlalchemy_only_fields = (
             'id',
             'email',
-            # 'books',
+            'books',
         )
 
     direct_field: str = strawberry.field(
@@ -93,6 +103,7 @@ class Query(GraphQLField):
             id=1,
             email='test email',
             direct_field='test 123',
+            books=[],
         )
 
     @paginated_field(node=ExampleTableNode)

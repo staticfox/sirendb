@@ -6,7 +6,7 @@ pytest_plugins = (
 
 def test_pull_books_as_property(client, db):
     from .fixtures import (
-        # Book,
+        Book,
         ExampleTable,
     )
 
@@ -17,9 +17,9 @@ def test_pull_books_as_property(client, db):
     db.session.add(row1)
     db.session.commit()
 
-    # book1 = Book(name='Book1', table_id=row1.id)
-    # db.session.add(book1)
-    # db.session.commit()
+    book1 = Book(name='Book1', table_id=row1.id)
+    db.session.add(book1)
+    db.session.commit()
 
     response = client.post(
         '/api/v1/test-graphql',
@@ -36,9 +36,9 @@ query getAllTables($paginate: Paginate, $sort: ExampleTableSortEnum, $filter: Ex
       directField
       id
       email
-      # books {
-      #   name
-      # }
+      books {
+        name
+      }
     }
   }
 }
@@ -55,9 +55,9 @@ query getAllTables($paginate: Paginate, $sort: ExampleTableSortEnum, $filter: Ex
                     'lastCursor': '',
                 },
                 'items': [{
-                    # 'books': [{
-                    #     'name': 'Book1',
-                    # }]
+                    'books': [{
+                        'name': 'Book1',
+                    }],
                     'directField': 'this is from the resolver',
                     'email': 'test email',
                     'id': row1.id,  # TODO: global IDs

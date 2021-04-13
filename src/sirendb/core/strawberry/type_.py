@@ -63,16 +63,7 @@ def _relationship_to_field(relationship: RelationshipProperty):
 
     type_ = table_to_type[relationship.target.name]
     if relationship.uselist:
-        # FIXME what do???
-        return StrawberryField(**{
-            'python_name': relationship.key,
-            'graphql_name': type_._type_definition.name,
-            'type_': [type_],
-            'is_optional': False,
-            'default_value': [],
-            'description': 'Collection of objects.',
-            'is_list': True,
-        })
+        return typing.List[type_]
     return type_
 
 
@@ -100,6 +91,22 @@ def _extract_sqlalchemy_orm_columns(
         fields[relationship.key] = _relationship_to_field(relationship)
 
     return fields
+
+
+def is_valid_field(item) -> bool:
+    # typing.List
+    if getattr(item, '__origin__', None) is list:
+        # TODO: This should only have 1 element, enforce it?
+        return is_valid_field(item.__args__[0])
+
+    if inspect.isclass(item):
+        type_def = getattr(item, '_type_definition', None)
+        if not isinstance(type_def, TypeDefinition) and not issubclass(item, StrawberryField):
+            return False
+    elif not isinstance(item, StrawberryField):
+        return False
+
+    return True
 
 
 class SchemaTypeMeta(type):
@@ -182,11 +189,7 @@ class SchemaTypeMeta(type):
         with_default = []
 
         for field_name, field_value in cls_namespce.items():
-            if inspect.isclass(field_value):
-                type_def = getattr(field_value, '_type_definition', None)
-                if not isinstance(type_def, TypeDefinition) and not issubclass(field_value, StrawberryField):
-                    continue
-            elif not isinstance(field_value, StrawberryField):
+            if not is_valid_field(field_value):
                 continue
 
             if getattr(field_value, 'default_value', None):

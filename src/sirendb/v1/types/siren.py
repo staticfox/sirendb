@@ -10,5 +10,5 @@ class SirenNode(GraphQLType):
             'id',
             'active',
             'model',
-            # 'locations',
+            'locations',
         )

@@ -1,4 +1,5 @@
 from sirendb.models.siren import Siren
+from sirendb.models.siren_location import SirenLocation
 from sirendb.models.siren_model import SirenModel
 
 pytest_plugins = (
@@ -20,11 +21,11 @@ query listSirens($paginate: Paginate, $sort: SirenSortEnum, $filter: SirenFilter
       model {
         name
       }
-      # locations {
-      #   topographicLatitude
-      #   topographicLongitude
-      #   topographicZoom
-      # }
+      locations {
+        topographicLatitude
+        topographicLongitude
+        topographicZoom
+      }
     }
   }
 }
@@ -41,6 +42,20 @@ def test_list_siren(app, user_client, db):
     siren.active = True
     db.session.add(siren)
     db.session.commit()
+
+    location = SirenLocation(
+        topographic_latitude=33.9379329,
+        topographic_longitude=-117.275838,
+        topographic_zoom=142.0,
+        siren_id=siren.id,
+    )
+    db.session.add(location)
+    db.session.commit()
+
+    # Ensure there is no floating point truncation
+    assert location.topographic_latitude == 33.9379329
+    assert location.topographic_longitude == -117.275838
+    assert location.topographic_zoom == 142.0
 
     user, client = user_client
 
@@ -62,10 +77,14 @@ def test_list_siren(app, user_client, db):
                 },
                 'items': [{
                     'active': True,
+                    'locations': [{
+                        'topographicLatitude': 33.9379329,
+                        'topographicLongitude': -117.275838,
+                        'topographicZoom': 142.0,
+                    }],
                     'model': {
                         'name': '3T22A',
-                    },
-                    # 'locations': []
+                    }
                 }]
             }
         }

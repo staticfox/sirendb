@@ -1,3 +1,5 @@
+from sqlalchemy.dialects.postgresql import DOUBLE_PRECISION
+
 from sirendb.core.db import db
 
 
@@ -15,42 +17,42 @@ class SirenLocation(db.Model):
         )
     )
     topographic_latitude = db.Column(
-        db.Float(16),
+        DOUBLE_PRECISION,
         default=None,
         doc=''
     )
     topographic_longitude = db.Column(
-        db.Float(16),
+        DOUBLE_PRECISION,
         default=None,
         doc=''
     )
     topographic_zoom = db.Column(
-        db.Float(14),
+        db.Float(precision=14),
         default=None,
         doc=''
     )
     street_latitude = db.Column(
-        db.Float(16),
+        DOUBLE_PRECISION,
         default=None,
         doc=''
     )
     street_longitude = db.Column(
-        db.Float(16),
+        DOUBLE_PRECISION,
         default=None,
         doc=''
     )
     street_heading = db.Column(
-        db.Float(16),
+        DOUBLE_PRECISION,
         default=None,
         doc=''
     )
     street_pitch = db.Column(
-        db.Float(4),
+        db.Float(precision=4),
         default=None,
         doc=''
     )
     street_zoom = db.Column(
-        db.Float(4),
+        db.Float(precision=4),
         default=None,
         doc=''
     )
@@ -61,7 +63,7 @@ class SirenLocation(db.Model):
     )
     system_id = db.Column(
         db.ForeignKey('siren_systems.id'),
-        nullable=False,
+        default=None,
         doc=''
     )
     installation_timestamp = db.Column(

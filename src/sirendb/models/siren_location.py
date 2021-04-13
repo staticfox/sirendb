@@ -27,7 +27,7 @@ class SirenLocation(db.Model):
         doc=''
     )
     topographic_zoom = db.Column(
-        db.Float(precision=14),
+        DOUBLE_PRECISION,
         default=None,
         doc=''
     )

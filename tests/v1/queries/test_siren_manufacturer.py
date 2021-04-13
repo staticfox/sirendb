@@ -26,6 +26,7 @@ query listManufacturers($paginate: Paginate, $sort: SirenManufacturerSortEnum, $
 
 def test_list_siren_manufacturer(app, user_client, db):
     siren_manufacturer = SirenManufacturer(name='Test Siren Manufacturer')
+    siren_manufacturer.created_timestamp = datetime.utcnow()
     siren_manufacturer.founded_timestamp = datetime.utcnow()
     db.session.add(siren_manufacturer)
     db.session.commit()

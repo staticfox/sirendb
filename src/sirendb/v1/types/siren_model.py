@@ -8,7 +8,11 @@ class SirenModelNode(GraphQLType):
         sqlalchemy_model = SirenModel
         sqlalchemy_only_fields = (
             'id',
+            'created_timestamp',
+            'modified_timestamp',
             'name',
+            'manufacturer',
+            'manufacturer_id',
             'start_of_production',
             'end_of_production',
             'info',

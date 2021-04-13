@@ -14,6 +14,20 @@ class SirenManufacturer(db.Model):
             'Identifies the primary key from the database.'
         )
     )
+    created_timestamp = db.Column(
+        db.DateTime,
+        nullable=False,
+        doc=(
+            'Timestamp when this entry was created.'
+        )
+    )
+    modified_timestamp = db.Column(
+        db.DateTime,
+        default=None,
+        doc=(
+            'Timestamp when this entry was last modified.'
+        )
+    )
     name = db.Column(
         db.String(80),
         nullable=False,

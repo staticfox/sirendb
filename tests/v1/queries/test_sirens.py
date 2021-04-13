@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sirendb.models.siren import Siren
 from sirendb.models.siren_location import SirenLocation
 from sirendb.models.siren_model import SirenModel
@@ -34,6 +36,7 @@ query listSirens($paginate: Paginate, $sort: SirenSortEnum, $filter: SirenFilter
 
 def test_list_siren(app, user_client, db):
     siren_model = SirenModel(name='3T22A')
+    siren_model.created_timestamp = datetime.utcnow()
     db.session.add(siren_model)
     db.session.commit()
 

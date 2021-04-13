@@ -20,6 +20,7 @@ from .paginate import (
     PaginatedField,
     SortingEnum,
 )
+from .paginated_fields import paginated_fields
 from .scalars import (
     LimitedStringScalar,
     StringLimitExceeded,
@@ -118,7 +119,7 @@ def make_filter(node: GraphQLField):
 
     # Setup our Strawberry type so dataclass is happy.
     cls = type.__new__(type, name, (object,), cls_namespce)
-    straberry_cls = strawberry.input(
+    strawberry_cls = strawberry.input(
         cls,
         name=name,
         description=f'Filters the collection of {node.Meta.name} objects.',
@@ -127,11 +128,11 @@ def make_filter(node: GraphQLField):
     # Now that everything has been created properly, we can
     # re-order the type definition so fields will be sent
     # to GraphQL in alphabetical order.
-    straberry_cls._type_definition._fields = sorted(
-        straberry_cls._type_definition._fields,
+    strawberry_cls._type_definition._fields = sorted(
+        strawberry_cls._type_definition._fields,
         key=lambda field: field.graphql_name
     )
-    return straberry_cls
+    return strawberry_cls
 
 
 class SchemaFieldRegistry(type):
@@ -210,6 +211,7 @@ class SchemaFieldRegistry(type):
                 namespace[value.method_name] = strawberry.field(
                     paginated_request, description=description
                 )
+                paginated_fields[value.node.Meta.sqlalchemy_model.__table__.name] = namespace[value.method_name]
 
         cls = type.__new__(meta, name, bases, namespace)
         meta.registry.setdefault(name, {})

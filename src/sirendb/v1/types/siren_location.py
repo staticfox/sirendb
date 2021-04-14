@@ -8,9 +8,9 @@ class SirenLocationNode(GraphQLType):
         sqlalchemy_model = SirenLocation
         sqlalchemy_only_fields = (
             'id',
-            'topographic_latitude',
-            'topographic_longitude',
-            'topographic_zoom',
+            'satellite_latitude',
+            'satellite_longitude',
+            'satellite_zoom',
             'street_latitude',
             'street_longitude',
             'street_heading',

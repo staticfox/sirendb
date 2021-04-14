@@ -16,65 +16,65 @@ class SirenLocation(db.Model):
             'Identifies the primary key from the database.'
         )
     )
-    topographic_latitude = db.Column(
+    satellite_latitude = db.Column(
         DOUBLE_PRECISION,
         default=None,
-        doc=''
+        doc="The location's satellite view latitude."
     )
-    topographic_longitude = db.Column(
+    satellite_longitude = db.Column(
         DOUBLE_PRECISION,
         default=None,
-        doc=''
+        doc="The location's satellite view longitude."
     )
-    topographic_zoom = db.Column(
+    satellite_zoom = db.Column(
         DOUBLE_PRECISION,
         default=None,
-        doc=''
+        doc="The location's satellite view zoom."
     )
     street_latitude = db.Column(
         DOUBLE_PRECISION,
         default=None,
-        doc=''
+        doc="The location's street view latitude."
     )
     street_longitude = db.Column(
         DOUBLE_PRECISION,
         default=None,
-        doc=''
+        doc="The location's street view longitude."
     )
     street_heading = db.Column(
         DOUBLE_PRECISION,
         default=None,
-        doc=''
+        doc="The location's street view heading."
     )
     street_pitch = db.Column(
         db.Float(precision=4),
         default=None,
-        doc=''
+        doc="The location's street view pitch."
     )
     street_zoom = db.Column(
         db.Float(precision=4),
         default=None,
-        doc=''
+        doc="The location's street view zoom."
     )
     siren_id = db.Column(
         db.ForeignKey('sirens.id'),
         nullable=False,
-        doc=''
+        doc="Identifies the siren's primary key from the database."
     )
     system_id = db.Column(
         db.ForeignKey('siren_systems.id'),
         default=None,
-        doc=''
+        doc="Identifies the system's primary key from the database."
     )
     installation_timestamp = db.Column(
         db.DateTime,
         default=None,
-        doc=''
+        doc='Timestamp indicating when the siren was installed at this location.'
     )
     removal_timestamp = db.Column(
         db.DateTime,
         default=None,
-        doc=''
+        doc='Timestamp indicating when the siren was removed from this location.'
     )
     # TODO: Testing Schedule, bind to the system or to the location.
 

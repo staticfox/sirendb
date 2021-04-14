@@ -25,9 +25,9 @@ query listSirens($paginate: Paginate, $sort: SirenSortEnum, $filter: SirenFilter
         name
       }
       locations {
-        topographicLatitude
-        topographicLongitude
-        topographicZoom
+        satelliteLatitude
+        satelliteLongitude
+        satelliteZoom
         siren {
           model {
             name
@@ -61,9 +61,9 @@ def test_list_siren(app, user_client, db):
     db.session.commit()
 
     location = SirenLocation(
-        topographic_latitude=33.9379329,
-        topographic_longitude=-117.275838,
-        topographic_zoom=142.0,
+        satellite_latitude=33.9379329,
+        satellite_longitude=-117.275838,
+        satellite_zoom=142.0,
         siren_id=siren.id,
         system_id=siren_system.id,
     )
@@ -71,9 +71,9 @@ def test_list_siren(app, user_client, db):
     db.session.commit()
 
     # Ensure there is no floating point truncation
-    assert location.topographic_latitude == 33.9379329
-    assert location.topographic_longitude == -117.275838
-    assert location.topographic_zoom == 142.0
+    assert location.satellite_latitude == 33.9379329
+    assert location.satellite_longitude == -117.275838
+    assert location.satellite_zoom == 142.0
 
     user, client = user_client
 
@@ -96,9 +96,9 @@ def test_list_siren(app, user_client, db):
                 'items': [{
                     'active': True,
                     'locations': [{
-                        'topographicLatitude': 33.9379329,
-                        'topographicLongitude': -117.275838,
-                        'topographicZoom': 142.0,
+                        'satelliteLatitude': 33.9379329,
+                        'satelliteLongitude': -117.275838,
+                        'satelliteZoom': 142.0,
                         'siren': {
                             'model': {
                                 'name': '3T22A'

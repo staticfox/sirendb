@@ -18,4 +18,9 @@ class SirenLocationNode(GraphQLType):
             'street_zoom',
             'installation_timestamp',
             'removal_timestamp',
+            'siren_id',
+            'siren',
+            'system_id',
+            'system',
+            'location_id',
         )

@@ -25,11 +25,6 @@ class Siren(db.Model):
             "Identifies the model's primary key from the database."
         )
     )
-    # location_id = db.Column(
-    #     db.Integer,
-    #     db.ForeignKey('siren_locations.id'),
-    #     default=None,
-    # )
     active = db.Column(
         db.Boolean,
         default=None,
@@ -43,9 +38,15 @@ class Siren(db.Model):
     )
     locations = db.relationship(
         'SirenLocation',
-        # foreign_keys=[location_id],
-        # uselist=False,
-        doc='The geographic position of the siren.'
+        uselist=True,
+        order_by='desc(SirenLocation.installation_timestamp)',
+        doc=(
+            'All known geographic locations of the siren. '
+            'This allows you to define previous installation sites for '
+            'a specific siren in order to document it moving locations. '
+            'This list is sorted by SirenLocation.installationTimestamp, '
+            'meaning the most recent installation location will appear first.'
+        )
     )
     # address = db.relationship(
     #     'SirenAddress',

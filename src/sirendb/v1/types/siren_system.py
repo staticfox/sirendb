@@ -19,4 +19,5 @@ class SirenSystemNode(GraphQLType):
             'country',
             'postal_code',
             'siren_wiki_url',
+            'locations',
         )

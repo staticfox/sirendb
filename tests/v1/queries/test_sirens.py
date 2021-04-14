@@ -3,6 +3,7 @@ from datetime import datetime
 from sirendb.models.siren import Siren
 from sirendb.models.siren_location import SirenLocation
 from sirendb.models.siren_model import SirenModel
+from sirendb.models.siren_system import SirenSystem
 
 pytest_plugins = (
     'tests.fixtures',
@@ -27,6 +28,14 @@ query listSirens($paginate: Paginate, $sort: SirenSortEnum, $filter: SirenFilter
         topographicLatitude
         topographicLongitude
         topographicZoom
+        siren {
+          model {
+            name
+          }
+        }
+        system {
+          name
+        }
       }
     }
   }
@@ -46,11 +55,17 @@ def test_list_siren(app, user_client, db):
     db.session.add(siren)
     db.session.commit()
 
+    siren_system = SirenSystem(name='Test Siren System')
+    siren_system.created_timestamp = datetime.utcnow()
+    db.session.add(siren_system)
+    db.session.commit()
+
     location = SirenLocation(
         topographic_latitude=33.9379329,
         topographic_longitude=-117.275838,
         topographic_zoom=142.0,
         siren_id=siren.id,
+        system_id=siren_system.id,
     )
     db.session.add(location)
     db.session.commit()
@@ -84,6 +99,14 @@ def test_list_siren(app, user_client, db):
                         'topographicLatitude': 33.9379329,
                         'topographicLongitude': -117.275838,
                         'topographicZoom': 142.0,
+                        'siren': {
+                            'model': {
+                                'name': '3T22A'
+                            }
+                        },
+                        'system': {
+                            'name': 'Test Siren System',
+                        },
                     }],
                     'model': {
                         'name': '3T22A',

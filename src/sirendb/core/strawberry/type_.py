@@ -55,11 +55,14 @@ def _column_to_field(column: Column) -> StrawberryField:
     })
 
 
-def _relationship_to_field(relationship: RelationshipProperty):
+def _generate_field_kwargs(relationship: RelationshipProperty):
     if relationship.target.name not in table_to_type:
+        # This should exist by now. If it doesn't then someone forgot
+        # to import the corresponding type.
         raise RuntimeError(
             f'_relationship_to_field called for {relationship.target.name} '
-            'but it was not in the type table.'
+            'but it was not in the type table. Did you forget to create and '
+            'import a GraphQLType with sqlalchemy_model specified?'
         )
 
     type_ = table_to_type[relationship.target.name]
@@ -82,6 +85,14 @@ def _relationship_to_field(relationship: RelationshipProperty):
             'is_optional': any([c.nullable for c in relationship.local_columns]),
             'type_': type_,
         })
+    return field_kwargs
+
+
+def _relationship_to_field(relationship: RelationshipProperty):
+    if relationship.target.name not in table_to_type:
+        return lambda: StrawberryField(**_generate_field_kwargs(relationship))
+
+    field_kwargs = _generate_field_kwargs(relationship)
     return StrawberryField(**field_kwargs)
 
 
@@ -136,6 +147,12 @@ class SchemaTypeMeta(type):
         * Adds the ability to set the description from the class's docstring
         * Sorts the type's fields in alphabetical order for easy searching
         '''
+        if not hasattr(meta, 'types'):
+            meta.types = {}
+
+        if not hasattr(meta, 'late_resolvers'):
+            meta.late_resolvers = []
+
         if not bases:
             return type.__new__(meta, name, bases, namespace)
 
@@ -207,8 +224,16 @@ class SchemaTypeMeta(type):
         with_default = []
 
         for field_name, field_value in cls_namespce.items():
-            if not is_valid_field(field_value):
+            field_value_name = getattr(field_value, '__name__', '')
+            is_late_resolver = bool(
+                callable(field_value) and field_value_name == '<lambda>'
+            )
+
+            if not is_valid_field(field_value) and not is_late_resolver:
                 continue
+
+            if is_late_resolver:
+                meta.late_resolvers.append((field_name, field_value, cls_name))
 
             default = getattr(field_value, 'default', None)
             default_factory = getattr(field_value, 'default_factory', None)
@@ -274,7 +299,30 @@ class SchemaTypeMeta(type):
         if sqlalchemy_model:
             table_to_type[sqlalchemy_model.__table__.name] = straberry_cls
 
+        meta.types[cls_name] = straberry_cls
         return straberry_cls
+
+    @classmethod
+    def resolve_lambdas(meta):
+        # Since a some types rely on each other, there's a good chance
+        # that dependency A may not exist when dependency B call for it.
+        # To circumvent this, we allow types to be lambdas so the types
+        # can be resolved once schema initialization actually takes place.
+        # Here we walk through each type and resolve it since everything
+        # should have already been imported by now.
+        for field_name, resolver, cls_name in meta.late_resolvers:
+            strawberry_cls = meta.types[cls_name]
+
+            # strawberry_cls.__dict__ in itself is a mappingproxy,
+            # so item assignment won't work here.
+            setattr(strawberry_cls, field_name, resolver())
+
+            # but everything within the mappingproxy itself does.
+            strawberry_cls.__dict__['__annotations__'][field_name] = resolver()
+            strawberry_cls.__dict__['__dataclass_fields__'][field_name].type = resolver()
+            for index, field in enumerate(strawberry_cls.__dict__['_type_definition']._fields):
+                if field.name == field_name:
+                    strawberry_cls.__dict__['_type_definition']._fields[index] = resolver()
 
 
 class GraphQLType(metaclass=SchemaTypeMeta):

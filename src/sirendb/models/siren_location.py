@@ -78,4 +78,17 @@ class SirenLocation(db.Model):
     )
     # TODO: Testing Schedule, bind to the system or to the location.
 
-    # system = db.relationship('SirenSystem')
+    siren = db.relationship(
+        'Siren',
+        foreign_keys=[siren_id],
+        uselist=False,
+        back_populates='locations',
+        doc='The siren at this location.',
+    )
+    system = db.relationship(
+        'SirenSystem',
+        foreign_keys=[system_id],
+        uselist=False,
+        back_populates='locations',
+        doc='The system that this location is a part of.'
+    )

@@ -101,3 +101,13 @@ class SirenSystem(db.Model):
             "The URL to the system's wiki.airraidsirens.net entry."
         )
     )
+    locations = db.relationship(
+        'SirenLocation',
+        uselist=True,
+        order_by='desc(SirenLocation.installation_timestamp)',
+        doc=(
+            'Associated siren locations within this system.'
+            'This list is sorted by SirenLocation.installationTimestamp, '
+            'meaning the most recent installation locations will appear first.'
+        )
+    )

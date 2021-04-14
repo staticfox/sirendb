@@ -3,11 +3,14 @@ from strawberry import Schema
 from strawberry.flask.views import GraphQLView
 
 from .field import SchemaFieldRegistry
+from .type_ import SchemaTypeMeta
 
 
 class GraphQLSchema(Schema):
     @classmethod
     def init_app(cls, app):
+        SchemaTypeMeta.resolve_lambdas()
+
         auth_required_endpoints = app.config.get('AUTH_REQUIRED_ENDPOINTS', (
             '/api/v1/graphql'
         ))

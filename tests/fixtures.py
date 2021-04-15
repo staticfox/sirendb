@@ -21,6 +21,8 @@ def app():
             'SQLALCHEMY_DATABASE_URI': DBFixtureNotIncluded,
             'SQLALCHEMY_TRACK_MODIFICATIONS': False,
             'SECRET_KEY': secrets.token_hex(24),
+            'RQ_ASYNC': False,
+            'RQ_CONNECTION_CLASS': 'fakeredis.FakeRedis',
             # 'SQLALCHEMY_ECHO': True,
         }
     )

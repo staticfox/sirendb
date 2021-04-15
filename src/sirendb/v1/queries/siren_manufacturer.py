@@ -1,5 +1,7 @@
-from __future__ import annotations
-from typing import Any, Optional
+from typing import (
+    Any,
+    Optional,
+)
 
 from sirendb.core.strawberry import GraphQLField
 from sirendb.core.strawberry.field import SortingEnum

@@ -1,4 +1,12 @@
+from __future__ import annotations
+
+from typing import (
+    NamedTuple,
+    Optional,
+)
+
 from sqlalchemy.dialects.postgresql import DOUBLE_PRECISION
+from sqlalchemy.sql import func
 
 from sirendb.core.db import db
 
@@ -16,6 +24,25 @@ class SirenLocation(db.Model):
             'Identifies the primary key from the database.'
         )
     )
+
+    # created_by_id
+    # created_by
+    created_timestamp = db.Column(
+        db.DateTime,
+        nullable=False,
+        server_default=func.now(),
+        doc='Timestamp when this entry was created.'
+    )
+
+    # modified_by_id
+    # modified_by
+    modified_timestamp = db.Column(
+        db.DateTime,
+        default=None,
+        onupdate=func.now(),
+        doc='Timestamp when this entry was last modified.'
+    )
+
     satellite_latitude = db.Column(
         DOUBLE_PRECISION,
         default=None,
@@ -92,3 +119,53 @@ class SirenLocation(db.Model):
         back_populates='locations',
         doc='The system that this location is a part of.'
     )
+    media = db.relationship(
+        'SirenMedia',
+        uselist=True,
+        back_populates='location',
+        doc='media associated with this location.',
+    )
+
+    @property
+    def satellite_coordinates(self) -> Optional[SatelliteCoordinates]:
+        if self.satellite_latitude and self.satellite_longitude and self.satellite_zoom:
+            return SatelliteCoordinates(
+                latitude=self.satellite_latitude,
+                longitude=self.satellite_longitude,
+                zoom=self.satellite_zoom,
+            )
+        else:
+            return None
+
+    @property
+    def street_coordinates(self) -> Optional[StreetCoordinates]:
+        if (
+            self.street_latitude and
+            self.street_longitude and
+            self.street_heading and
+            self.street_pitch and
+            self.street_zoom
+        ):
+            return StreetCoordinates(
+                latitude=self.street_latitude,
+                longitude=self.street_longitude,
+                heading=self.street_heading,
+                pitch=self.street_pitch,
+                zoom=self.street_zoom,
+            )
+        else:
+            return None
+
+
+class SatelliteCoordinates(NamedTuple):
+    latitude: float
+    longitude: float
+    zoom: float
+
+
+class StreetCoordinates(NamedTuple):
+    latitude: float
+    longitude: float
+    heading: float
+    pitch: float
+    zoom: float

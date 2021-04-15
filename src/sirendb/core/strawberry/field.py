@@ -97,8 +97,8 @@ def make_filters(node: GraphQLField) -> Dict[str, StrawberryField]:
                 'python_name': column.key,
                 'graphql_name': column.key,
                 'type_': type_,
-                'is_optional': column.nullable,
-                'default_value': column.default,
+                'is_optional': True,
+                'default_value': None,
                 'description': description,
             })
 

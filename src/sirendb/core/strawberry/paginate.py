@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from enum import Enum
 import functools
 import re
@@ -25,9 +23,6 @@ class PaginatedField:
         self.method = method
         self.method_name = method.__name__
         self.node = node
-
-    def __call__(self, *args, **kwargs):
-        return self.method(*args, **kwargs)
 
 
 def paginated_field(func=None, node=None):

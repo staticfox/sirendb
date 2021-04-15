@@ -47,6 +47,7 @@ mutation createLocation($form: CreateSirenLocationInput!) {
 }
 '''
 
+
 @pytest.fixture(autouse=True)
 def patch_imaging_config(app):
     if not app.config.get('BIN_DIR'):
@@ -61,7 +62,7 @@ def test_create_siren_location(app, user_client, db, **kwarg):
     print('')
     user, client = user_client
 
-    freezer = kwarg['freezer']
+    # freezer = kwarg['freezer']
     siren_model = SirenModel(name='3T22A')
     siren_model.created_timestamp = datetime.utcnow()
     db.session.add(siren_model)

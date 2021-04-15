@@ -16,7 +16,6 @@ class DBFixtureNotIncluded:
 @pytest.fixture(scope='session')
 def app():
     app = create_app(
-        config_file=None,
         config={
             'SQLALCHEMY_DATABASE_URI': DBFixtureNotIncluded,
             'SQLALCHEMY_TRACK_MODIFICATIONS': False,

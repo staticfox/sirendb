@@ -32,10 +32,10 @@ class SirenMedia(db.Model):
             'The type of media.'
         )
     )
-    download_url = db.Column(
+    filename = db.Column(
         db.String,
-        nullable=False,
-        doc='Network location of this media.'
+        default=None,
+        doc='The name of the file.'
     )
     mimetype = db.Column(
         db.String,
@@ -51,6 +51,11 @@ class SirenMedia(db.Model):
         db.ForeignKey('siren_locations.id'),
         nullable=False,
         doc="Identifies the siren location's primary key from the database."
+    )
+    filesystem_uri = db.Column(
+        db.String,
+        nullable=False,
+        doc='Identifies the location within the internal filesystem.'
     )
     location = db.relationship(
         'SirenLocation',

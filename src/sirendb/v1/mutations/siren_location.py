@@ -10,6 +10,7 @@ from sirendb.core.strawberry import (
     GraphQLField,
     GraphQLType,
 )
+from sirendb.core.strawberry.paginate import _build_dataclass
 from sirendb.jobs.imaging import (
     capture_satellite_image,
     capture_streetview_image,
@@ -95,28 +96,23 @@ class Mutation(GraphQLField):
         db.session.add(siren_location)
         db.session.commit()
 
-        log.debug('/api/v1/graphql mutation createSirenLocation(satellite={satellite}, street={street}, system={system})'.format(  # noqa
-            satellite=siren_location.satellite_coordinates is not None,
-            street=siren_location.street_coordinates is not None,
-            system=siren_location.system_id is not None,
-        ))
-
         queue = rq.get_queue('imaging_for_api')
 
         if siren_location.satellite_coordinates:
             queue.enqueue(capture_satellite_image, args=(
                 siren_location.id,
                 siren_location.satellite_coordinates,
-            ), job_timeout=300, description='capture satellite coordinates')
+            ), job_timeout=300, description='capture satellite image')
 
         if siren_location.street_coordinates:
             queue.enqueue(capture_streetview_image, args=(
                 siren_location.id,
                 siren_location.street_coordinates,
-            ), job_timeout=300, description='capture streetview coordinates')
+            ), job_timeout=300, description='capture streetview image')
 
         return Output(
             ok=True,
             message='',
-            siren_location=siren_location,
+            # FIXME: how 2 integrate better?
+            siren_location=_build_dataclass(SirenLocationNode, siren_location),
         )

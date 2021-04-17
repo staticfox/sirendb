@@ -1,15 +1,19 @@
 import logging
 from pathlib import Path
-import secrets
-import time
 
 from flask import current_app
 
+from sirendb.core.db import db
 from sirendb.core.rq import rq
 from sirendb.models.siren_location import (
     SatelliteCoordinates,
     StreetCoordinates,
 )
+from sirendb.models.siren_media import (
+    SirenMedia,
+    SirenMediaType,
+)
+from sirendb.lib.storage import storage
 
 from .chrome import Chrome
 from .nginx import Nginx
@@ -29,7 +33,7 @@ def _capture_image(http_path: str) -> Path:
         return
 
     with Nginx(bin_dir=bin_dir, geo_dir=geo_dir) as netloc:
-        time.sleep(3)
+        # time.sleep(3)
 
         with Chrome(bin_dir=bin_dir) as chrome:
             local_url = f'http://{netloc}/{http_path}'
@@ -50,21 +54,25 @@ def capture_satellite_image(location_id: int, coordinates: SatelliteCoordinates)
         lng=coordinates.longitude,
         zoom=coordinates.zoom,
     )
-    log.info(f'{location_id=} {coordinates=}')
+    log.info(f'capturing screenshot for {location_id}')
     screenshot = _capture_image(http_path)
     if not screenshot:
         return
 
-    image_dir = current_app.config.get('IMAGE_STORE_PATH')
-    if not image_dir:
-        log.error('capture_satellite_image failed: missing IMAGE_STORE_PATH')
-        return
+    media = SirenMedia(
+        media_type=SirenMediaType.SATELLITE_IMAGE,
+        mimetype='image/png',
+        kilobytes=(len(screenshot) / 1024),
+        location_id=location_id,
+    )
 
-    while (image_path := Path(f'{image_dir}/{secrets.token_hex(18)}.png')).is_file():
-        pass
+    upload_result = storage.upload(screenshot, '.png', 'image/png')
+    if upload_result:
+        media.filename = upload_result.filesystem_key
+        media.filesystem_uri = upload_result.filesystem_uri
 
-    image_path.write_bytes(screenshot)
-    log.info(f'captured satellite screenshot {image_path.name} for {location_id}')
+    db.session.add(media)
+    db.session.commit()
 
 
 @rq.job
@@ -81,14 +89,17 @@ def capture_streetview_image(location_id: int, coordinates: StreetCoordinates) -
     if not screenshot:
         return
 
-    image_dir = current_app.config.get('IMAGE_STORE_PATH')
-    if not image_dir:
-        log.error('capture_streetview_image failed: missing IMAGE_STORE_PATH')
-        return
+    media = SirenMedia(
+        media_type=SirenMediaType.STREET_IMAGE,
+        mimetype='image/png',
+        kilobytes=(len(screenshot) / 1024),
+        location_id=location_id,
+    )
 
-    while (image_path := Path(f'{image_dir}/{secrets.token_hex(18)}.png')).is_file():
-        pass
+    upload_result = storage.upload(screenshot, '.png', 'image/png')
+    if upload_result:
+        media.filename = upload_result.filesystem_key
+        media.filesystem_uri = upload_result.filesystem_uri
 
-    image_path.write_bytes(screenshot)
-
-    log.info(f'captured street screenshot {image_path.name} for {location_id}')
+    db.session.add(media)
+    db.session.commit()

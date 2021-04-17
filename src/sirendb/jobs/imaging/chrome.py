@@ -1,7 +1,7 @@
 import base64
 import logging
 import sys
-import time
+# import time
 
 from selenium.webdriver import (
     Chrome as ChromeDriver,
@@ -20,7 +20,7 @@ class Chrome:
         self._driver.get(url)
 
         # FIXME Wait til it's loaded
-        time.sleep(3)
+        # time.sleep(3)
 
         log.debug('taking screenshot...')
         response = self._driver.execute_cdp_cmd('Page.captureScreenshot', {})

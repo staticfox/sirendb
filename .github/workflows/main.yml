@@ -16,13 +16,6 @@ jobs:
           python-version: '3.9.2'
           architecture: 'x64'
 
-      # - name: Install Third Party Tools
-      #   run: |
-      #     # bash bin/get_chrome.sh
-
-      #     # TODO download binary from s3 bucket instead
-      #     # bash bin/get_nginx.sh
-
       - name: Update pip, wheel, and setuptools
         run: pip install -U pip wheel setuptools
 
@@ -36,9 +29,6 @@ jobs:
 
       - name: Run flake8
         run: flake8 src tests
-
-      - name: Generate test config file
-        run: python .github/workflows/build_env.py
 
       - name: Run tests
         run: |

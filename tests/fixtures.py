@@ -1,12 +1,26 @@
-import tempfile
+import os
 import secrets
 import shutil
 import subprocess
+import tempfile
 
+from fakeredis import FakeRedis
 import pytest
 
 from sirendb.core.db import db as db_
+from sirendb.core.redis import redis as redis_
 from sirendb.web.flask import create_app
+
+
+@pytest.fixture(autouse=True)
+def redis(app, client):
+    yield
+
+    if type(redis_.__local) != FakeRedis:
+        assert False, 'you should be using fakeredis!'
+        return
+
+    redis_.flushall()
 
 
 class DBFixtureNotIncluded:
@@ -15,6 +29,8 @@ class DBFixtureNotIncluded:
 
 @pytest.fixture(scope='session')
 def app():
+    os.environ['FLASK_CONFIG'] = ''
+
     app = create_app(
         config={
             'SQLALCHEMY_DATABASE_URI': DBFixtureNotIncluded,
@@ -22,6 +38,11 @@ def app():
             'SECRET_KEY': secrets.token_hex(24),
             'RQ_ASYNC': False,
             'RQ_CONNECTION_CLASS': 'fakeredis.FakeRedis',
+            'TESTING': True,
+            'BIN_DIR': '/app/bin',
+            'GEO_BUILD_DIR': '/app/geo/build',
+            'IMAGE_STORE_TYPE': 'test',
+            'IMAGE_STORE_BASE_URL': 'http://localhost:5000/media',
             # 'SQLALCHEMY_ECHO': True,
         }
     )

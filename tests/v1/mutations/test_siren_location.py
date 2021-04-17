@@ -1,12 +1,16 @@
+import base64
+# import builtins
 from datetime import datetime
 
 from freezegun import freeze_time
 import pytest
+import subprocess
 
 from sirendb.models.siren import Siren
 from sirendb.models.siren_model import SirenModel
 from sirendb.models.siren_system import SirenSystem
-
+from sirendb.jobs.imaging import chrome
+from sirendb.jobs.imaging.nginx import Nginx
 
 pytest_plugins = (
     'tests.fixtures',
@@ -16,6 +20,11 @@ pytest_plugins = (
 
 CREATE_QUERY = '''
 fragment LocationProps on SirenLocation {
+  media {
+    downloadUrl
+    mediaType
+    mimetype
+  }
   satelliteLatitude
   satelliteLongitude
   satelliteZoom
@@ -57,12 +66,70 @@ def patch_imaging_config(app):
         pytest.skip('missing GEO_BUILD_DIR')
 
 
+@pytest.fixture(autouse=True)
+def patch_subprocess(app, monkeypatch):
+    calls = []
+
+    def add_call(*args, **kwargs):
+        calls.append((args, kwargs))
+
+    monkeypatch.setattr(subprocess, 'Popen', add_call)
+    yield calls
+    calls.clear()
+
+
+@pytest.fixture(autouse=True)
+def patch_chrome_driver(app, monkeypatch):
+    class FakeChromeDriver:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def execute_cdp_cmd(self, cmd_name: str, options: dict) -> dict:
+            return {
+                'data': base64.b64encode(b'data'),
+            }
+
+        def get(self, url: str):
+            pass
+
+        def get_log(self, log_name: str):
+            return []
+
+        def quit(self):
+            pass
+
+        def __enter__(self, *args, **kwargs):
+            return self
+
+        def __exit__(self, *args, **kwargs):
+            pass
+
+    calls = []
+
+    def add_call(*args, **kwargs):
+        with FakeChromeDriver(*args, **kwargs) as driver:
+            calls.append((args, kwargs, driver))
+            return driver
+
+    monkeypatch.setattr(chrome, 'ChromeDriver', add_call)
+    yield calls
+    calls.clear()
+
+
+@pytest.fixture(autouse=True)
+def patch_open(app, monkeypatch):
+    monkeypatch.setattr(Nginx, '_write_config', lambda self: '')
+    monkeypatch.setattr(Nginx, '_remove_config', lambda self: '')
+
+    yield
+
+
 @freeze_time('2021-04-03T06:13:09.291212', as_kwarg='freezer')
-def test_create_siren_location(app, user_client, db, **kwarg):
-    print('')
+def test_create_siren_location(app, user_client, db, **kwargs):
+    # print('')
     user, client = user_client
 
-    # freezer = kwarg['freezer']
+    # freezer = kwargs['freezer']
     siren_model = SirenModel(name='3T22A')
     siren_model.created_timestamp = datetime.utcnow()
     db.session.add(siren_model)
@@ -103,7 +170,19 @@ def test_create_siren_location(app, user_client, db, **kwarg):
         }
     )
     assert response.status_code == 200
-    assert response.json == {
+
+    response_json = dict(response.json)
+    media = response_json['data']['createSirenLocation']['sirenLocation'].pop('media')
+
+    assert len(media) == 2
+    media_types = {'SATELLITE_IMAGE', 'STREET_IMAGE'}
+    for item in media:
+        assert item['downloadUrl'] is not None
+        media_types.remove(item['mediaType'])
+        assert item['mimetype'] == 'image/png'
+    assert not media_types
+
+    assert response_json == {
         'data': {
             'createSirenLocation': {
                 'message': '',

@@ -5,9 +5,9 @@ import signal
 import subprocess
 import time
 
-# from rq import get_current_job
+from rq import get_current_job
 
-# from sirendb.core.redis import redis
+from sirendb.core.redis import redis
 
 from .conf import NGINX_CFG
 
@@ -15,26 +15,17 @@ log = logging.getLogger('sirendb.imaging.nginx')
 
 
 def _get_port_for_geo_job() -> int:
-    # job = get_current_job()
-    # if job:
-    #     job_id = job.id
-    # else:
-    #     job_id = '0'
+    job = get_current_job()
+    if job:
+        job_id = job.id
+    else:
+        job_id = '0'
 
     for portno in range(22000, 32000):
-        # FIXME: this is only needed if an instance of this app
-        #        is running more than once on a machine.
-        #
-        #        RQ in itself does not thread jobs, but more than
-        #        once instance of a worker may run at the same time
-        #        on any given machine.
-        #
-        #        I don't want to commit to redis right now since the
-        #        project is intended to be run in a cluster.
-        #
-        # key = f'sirendb-dev:geoserverport:{portno}'
-        # if not redis.set(key, job_id, nx=True, ex=30):
-        #     continue
+        # TODO: consistent key prefix
+        key = f'sirendb-dev:nginx-port:{portno}'
+        if not redis.set(key, job_id, nx=True, ex=30):
+            continue
         return portno
 
 
@@ -95,7 +86,7 @@ class Nginx:
 
         os.kill(self._proc.pid, signal.SIGTERM)
 
-        # FIXME this can get stuck when SIGINT is sent cuz its not propaged
+        # FIXME this can get stuck when SIGINT is sent cuz its not propagated
         if self._proc.poll():
             log.debug('waiting for process to exit...')
             time.sleep(3)

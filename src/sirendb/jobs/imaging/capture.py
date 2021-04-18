@@ -1,5 +1,5 @@
 import logging
-from pathlib import Path
+from typing import Optional
 
 from flask import current_app
 
@@ -21,19 +21,20 @@ from .nginx import Nginx
 log = logging.getLogger('sirendb.imaging.capture')
 
 
-def _capture_image(http_path: str) -> Path:
+def _capture_image(http_path: str) -> Optional[bytes]:
     bin_dir = current_app.config.get('BIN_DIR')
     if not bin_dir:
         log.error('_capture_image failed: missing BIN_DIR')
-        return
+        return None
 
     geo_dir = current_app.config.get('GEO_BUILD_DIR')
     if not geo_dir:
         log.error('_capture_image failed: missing GEO_BUILD_DIR')
-        return
+        return None
 
     with Nginx(bin_dir=bin_dir, geo_dir=geo_dir) as netloc:
-        # time.sleep(3)
+        if not netloc:
+            return None
 
         with Chrome(bin_dir=bin_dir) as chrome:
             local_url = f'http://{netloc}/{http_path}'
@@ -48,7 +49,7 @@ def _capture_image(http_path: str) -> Path:
 
 
 @rq.job
-def capture_satellite_image(location_id: int, coordinates: SatelliteCoordinates) -> dict:
+def capture_satellite_image(location_id: int, coordinates: SatelliteCoordinates) -> None:
     http_path = 'sat?lat={lat}&lng={lng}&zoom={zoom}'.format(
         lat=coordinates.latitude,
         lng=coordinates.longitude,
@@ -66,10 +67,10 @@ def capture_satellite_image(location_id: int, coordinates: SatelliteCoordinates)
         location_id=location_id,
     )
 
-    upload_result = storage.upload(screenshot, '.png', 'image/png')
-    if upload_result:
-        media.filename = upload_result.filesystem_key
-        media.filesystem_uri = upload_result.filesystem_uri
+    save_result = storage.save(screenshot, 'png', 'image/png')
+    if save_result:
+        media.filename = save_result.filesystem_key
+        media.filesystem_uri = save_result.filesystem_uri
 
     db.session.add(media)
     db.session.commit()
@@ -96,10 +97,10 @@ def capture_streetview_image(location_id: int, coordinates: StreetCoordinates) -
         location_id=location_id,
     )
 
-    upload_result = storage.upload(screenshot, '.png', 'image/png')
-    if upload_result:
-        media.filename = upload_result.filesystem_key
-        media.filesystem_uri = upload_result.filesystem_uri
+    save_result = storage.save(screenshot, 'png', 'image/png')
+    if save_result:
+        media.filename = save_result.filesystem_key
+        media.filesystem_uri = save_result.filesystem_uri
 
     db.session.add(media)
     db.session.commit()

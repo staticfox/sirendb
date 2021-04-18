@@ -4,15 +4,14 @@ import inspect
 import typing
 
 from flask_sqlalchemy import Model
+from sqlalchemy import inspect as sql_inspect
+from sqlalchemy.orm.relationships import RelationshipProperty
+from sqlalchemy.sql.schema import Column
 import strawberry
 from strawberry.field import StrawberryField
 from strawberry.types.types import TypeDefinition
-from sqlalchemy.sql.schema import Column
-from sqlalchemy import inspect as sql_inspect
-from sqlalchemy.orm.relationships import RelationshipProperty
 from strawberry.utils.str_converters import to_camel_case
 
-# from .paginated_fields import paginated_fields
 from .scalars import (
     LimitedStringScalar,
     StringLimitExceeded,

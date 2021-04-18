@@ -1,7 +1,8 @@
 import base64
 import logging
 import sys
-# import time
+import time
+from typing import Optional
 
 from selenium.webdriver import (
     Chrome as ChromeDriver,
@@ -16,11 +17,14 @@ class Chrome:
         self._bin_dir = bin_dir
         self._driver = None
 
-    def capture_screenshot(self, url: str):
+    def capture_screenshot(self, url: str) -> Optional[bytes]:
+        if not self._driver:  # pragma: nocover
+            return None
+
         self._driver.get(url)
 
         # FIXME Wait til it's loaded
-        # time.sleep(3)
+        time.sleep(3)
 
         log.debug('taking screenshot...')
         response = self._driver.execute_cdp_cmd('Page.captureScreenshot', {})

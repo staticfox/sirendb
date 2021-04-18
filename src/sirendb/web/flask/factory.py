@@ -2,7 +2,6 @@ import logging
 import logging.config
 import os
 from pathlib import Path
-from typing import NamedTuple
 
 from flask import Flask
 from flask_migrate import Migrate

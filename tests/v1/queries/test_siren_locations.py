@@ -63,6 +63,7 @@ query listLocations($paginate: Paginate, $sort: SirenLocationSortEnum, $filter: 
 }
 '''
 
+
 @freeze_time('2021-04-03T06:13:09.291212')
 def test_list_siren_locations(app, user_client, db):
     siren_system = SirenSystem(name='Test Siren System')

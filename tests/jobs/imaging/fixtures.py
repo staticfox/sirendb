@@ -6,11 +6,15 @@ from sirendb.jobs.imaging import (
 )
 from sirendb.jobs.imaging.nginx import Nginx
 from tests.utils.networking import (
-    Popen,
+    Popen as _Popen,
     Socket,
 )
 
 from .chrome_driver import FakeChromeDriver
+
+
+class Popen(_Popen):
+    _want_delay = True
 
 
 @pytest.fixture(autouse=True)

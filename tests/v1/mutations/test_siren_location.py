@@ -55,11 +55,10 @@ mutation createLocation($form: CreateSirenLocationInput!) {
 '''
 
 
-def test_create_siren_location(app, user_client, db, **kwargs):
+def test_create_siren_location(app, user_client, db):
     with freeze_time('2021-04-03T06:13:09.291212'):
         user, client = user_client
 
-        # freezer = kwargs['freezer']
         siren_model = SirenModel(name='3T22A')
         siren_model.created_timestamp = datetime.utcnow()
         db.session.add(siren_model)

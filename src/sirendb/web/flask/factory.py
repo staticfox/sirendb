@@ -4,10 +4,7 @@ import os
 from pathlib import Path
 from typing import NamedTuple
 
-from flask import (
-    Config as Config_,
-    Flask as Flask_,
-)
+from flask import Flask
 from flask_migrate import Migrate
 import yaml
 
@@ -18,42 +15,6 @@ from sirendb.core.rq import rq
 from sirendb.core.strawberry import GraphQLSchema
 from sirendb.lib.storage import storage
 import sirendb.v1  # noqa
-
-
-# class Namespace
-# namespaces = {
-#     'IMAGE_STORE_': {
-#         ''
-#     }
-# }
-
-
-class FilesystemConfig(NamedTuple):
-    type_: str
-    path: str
-    base_url: str
-
-
-class Config(Config_):
-    def get_image_store(self):
-        cfg = self.get_namespace('IMAGE_STORE_')
-        if not cfg:
-            return None
-
-        type_ = cfg.get('type', '').lower()
-
-        if type_ == 'fs' and 'base_url' in cfg and 'path' in cfg:
-            return FilesystemConfig(
-                type_=type_,
-                base_url=cfg['base_url'],
-                path=cfg['path'],
-            )
-        else:
-            return None
-
-
-class Flask(Flask_):
-    config_class = Config
 
 
 def create_app(config: dict = None):

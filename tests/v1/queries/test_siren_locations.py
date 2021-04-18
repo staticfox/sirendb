@@ -1,7 +1,6 @@
 from datetime import datetime
 
 from freezegun import freeze_time
-import pytest
 
 from sirendb.models.siren import Siren
 from sirendb.models.siren_location import SirenLocation
@@ -63,20 +62,6 @@ query listLocations($paginate: Paginate, $sort: SirenLocationSortEnum, $filter: 
   }
 }
 '''
-
-
-@pytest.fixture(autouse=True)
-def patch_store_config(app):
-    app.config['IMAGE_STORE_BASE_URL'] = 'http://localhost:5000/media'
-    app.config['IMAGE_STORE_TYPE'] = 'testing'
-    app.config['IMAGE_STORE_PATH'] = '/images'
-
-    yield
-
-    del app.config['IMAGE_STORE_BASE_URL']
-    del app.config['IMAGE_STORE_TYPE']
-    del app.config['IMAGE_STORE_PATH']
-
 
 @freeze_time('2021-04-03T06:13:09.291212')
 def test_list_siren_locations(app, user_client, db):

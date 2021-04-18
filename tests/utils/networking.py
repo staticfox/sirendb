@@ -31,6 +31,7 @@ class Socket:
 
 
 class Popen:
+    _want_delay = False
     _times_instanced = 0
 
     def __init__(self, *args, **kwargs):
@@ -46,6 +47,9 @@ class Popen:
         pass
 
     def poll(self) -> bool:
+        if not self.__class__._want_delay:
+            return False
+
         if self.__class__._times_instanced == 2:
             return True
         return False

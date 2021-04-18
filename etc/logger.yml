@@ -1,0 +1,39 @@
+version: 1
+disable_existing_loggers: true
+incremental: false
+
+formatters:
+  default:
+    format: '%(asctime)-8s %(name)-25s %(levelname)-8s %(message)s'
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: DEBUG
+    formatter: default
+
+loggers:
+  sirendb:
+    handlers: [console]
+    propagate: false
+    level: DEBUG
+  flask_migrate:
+    handlers: [console]
+    propagate: false
+    level: INFO
+  # sqlalchemy:
+  #   handlers: [console]
+  #   propagate: true
+  #   level: DEBUG
+  # sqlalchemy.engine:
+  #   handlers: [console]
+  #   propagate: true
+  #   level: INFO
+  # werkzeug:
+  #   handlers: [console]
+  #   propagate: false
+  #   level: DEBUG
+
+root:
+  handlers: [console]
+  level: DEBUG

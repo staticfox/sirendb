@@ -1,16 +1,17 @@
 from dataclasses import MISSING
+from enum import Enum
 import inspect
 import typing
 
 from flask_sqlalchemy import Model
+from sqlalchemy import inspect as sql_inspect
+from sqlalchemy.orm.relationships import RelationshipProperty
+from sqlalchemy.sql.schema import Column
 import strawberry
 from strawberry.field import StrawberryField
 from strawberry.types.types import TypeDefinition
-from sqlalchemy.sql.schema import Column
-from sqlalchemy import inspect as sql_inspect
-from sqlalchemy.orm.relationships import RelationshipProperty
+from strawberry.utils.str_converters import to_camel_case
 
-# from .paginated_fields import paginated_fields
 from .scalars import (
     LimitedStringScalar,
     StringLimitExceeded,
@@ -25,6 +26,12 @@ def _column_to_field(column: Column) -> StrawberryField:
     description = column.doc
     if description is not None:
         description = description.strip().rstrip()
+
+    if issubclass(type_, Enum):
+        return strawberry.enum(Enum(type_.key, ' '.join([
+            key
+            for key in type_.__members__.keys()
+        ])))
 
     # Allow the type itself to raise the GraphQL error
     # instead of doing basic repetitive string size checks
@@ -96,8 +103,18 @@ def _relationship_to_field(relationship: RelationshipProperty):
     return StrawberryField(**field_kwargs)
 
 
+def _enum_to_field(column: Column, cls_name: str):
+    enum_name = to_camel_case(cls_name + column.key.capitalize())
+    enum_fields = ' '.join([
+        key
+        for key in column.type.python_type.__members__.keys()
+    ])
+    return strawberry.enum(Enum(enum_name, enum_fields))
+
+
 def _extract_sqlalchemy_orm_columns(
     model: Model,
+    cls_name: str,
     only_fields: typing.Tuple[str] = (),
 ) -> typing.Dict[str, StrawberryField]:
     fields = {}
@@ -111,7 +128,11 @@ def _extract_sqlalchemy_orm_columns(
     for column in table.columns:
         if only_fields and column.key not in only_fields:
             continue
-        fields[column.key] = _column_to_field(column)
+
+        if issubclass(column.type.python_type, Enum):
+            fields[column.key] = _enum_to_field(column, cls_name)
+        else:
+            fields[column.key] = _column_to_field(column)
 
     mapper = sql_inspect(model)
     for relationship in mapper.relationships:
@@ -129,13 +150,20 @@ def is_valid_field(item) -> bool:
         return is_valid_field(item.__args__[0])
 
     if inspect.isclass(item):
-        type_def = getattr(item, '_type_definition', None)
-        if not isinstance(type_def, TypeDefinition) and not issubclass(item, StrawberryField):
-            return False
-    elif not isinstance(item, StrawberryField):
-        return False
+        if issubclass(item, StrawberryField):
+            return True
 
-    return True
+        if issubclass(item, Enum):
+            return True
+
+        type_def = getattr(item, '_type_definition', None)
+        if isinstance(type_def, TypeDefinition):
+            return True
+    else:
+        if isinstance(item, StrawberryField):
+            return True
+
+    return False
 
 
 class SchemaTypeMeta(type):
@@ -178,7 +206,11 @@ class SchemaTypeMeta(type):
             if hasattr(Meta, 'sqlalchemy_model'):
                 sqlalchemy_model = Meta.sqlalchemy_model
                 only_fields = getattr(Meta, 'sqlalchemy_only_fields', ())
-                fields = _extract_sqlalchemy_orm_columns(sqlalchemy_model, only_fields)
+                fields = _extract_sqlalchemy_orm_columns(
+                    model=sqlalchemy_model,
+                    cls_name=cls_name,
+                    only_fields=only_fields,
+                )
                 for field_name, field_value in fields.items():
                     if field_name in cls_namespce:
                         continue
@@ -222,6 +254,7 @@ class SchemaTypeMeta(type):
 
         without_default = []
         with_default = []
+        with_resolver = {}
 
         for field_name, field_value in cls_namespce.items():
             field_value_name = getattr(field_value, '__name__', '')
@@ -229,7 +262,11 @@ class SchemaTypeMeta(type):
                 callable(field_value) and field_value_name == '<lambda>'
             )
 
-            if not is_valid_field(field_value) and not is_late_resolver:
+            inner_field_name = None
+            if field_name.startswith('resolve_'):
+                inner_field_name = field_name[8:]
+
+            if not inner_field_name and not is_valid_field(field_value) and not is_late_resolver:
                 continue
 
             if is_late_resolver:
@@ -238,7 +275,13 @@ class SchemaTypeMeta(type):
             default = getattr(field_value, 'default', None)
             default_factory = getattr(field_value, 'default_factory', None)
 
-            if default is MISSING and default_factory is MISSING:
+            missing_default = default is MISSING and default_factory is MISSING
+
+            if inner_field_name:
+                with_resolver[inner_field_name] = (field_value, missing_default)
+                continue
+
+            if missing_default:
                 without_default.append((field_name, field_value))
             else:
                 with_default.append((field_name, field_value))
@@ -254,12 +297,12 @@ class SchemaTypeMeta(type):
         new_cls_annotations = {}
 
         # Insert fields without default values first.
-        for pair in without_default:
-            new_cls_namespce[pair[0]] = pair[1]
+        for field_name, field_value in without_default:
+            new_cls_namespce[field_name] = field_value
 
         # Insert fields with default values after.
-        for pair in with_default:
-            new_cls_namespce[pair[0]] = pair[1]
+        for field_name, field_value in with_default:
+            new_cls_namespce[field_name] = field_value
 
         old_annotations = dict(cls_namespce['__annotations__'])
         # Since new_cls_namespce is correctly sorted, we can re-apply
@@ -274,6 +317,11 @@ class SchemaTypeMeta(type):
             if key in new_cls_namespce:
                 continue
             new_cls_namespce[key] = value
+
+        # # Drop in resolvers now
+        for key, (value, missing_default) in with_resolver.items():
+            assert key in new_cls_namespce['__annotations__'], f'{key} not in namespace!'
+            new_cls_namespce['resolve_' + key] = value
 
         # GraphQL treats input types different from regular types.
         if namespace.get('__isinput__') is True:

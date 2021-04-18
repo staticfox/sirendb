@@ -22,5 +22,5 @@ class SirenLocationNode(GraphQLType):
             'siren',
             'system_id',
             'system',
-            'location_id',
+            'media',
         )

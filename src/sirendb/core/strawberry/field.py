@@ -20,7 +20,6 @@ from .paginate import (
     PaginatedField,
     SortingEnum,
 )
-from .paginated_fields import paginated_fields
 from .scalars import (
     LimitedStringScalar,
     StringLimitExceeded,
@@ -97,8 +96,8 @@ def make_filters(node: GraphQLField) -> Dict[str, StrawberryField]:
                 'python_name': column.key,
                 'graphql_name': column.key,
                 'type_': type_,
-                'is_optional': column.nullable,
-                'default_value': column.default,
+                'is_optional': True,
+                'default_value': None,
                 'description': description,
             })
 
@@ -211,7 +210,6 @@ class SchemaFieldRegistry(type):
                 namespace[value.method_name] = strawberry.field(
                     paginated_request, description=description
                 )
-                paginated_fields[value.node.Meta.sqlalchemy_model.__table__.name] = namespace[value.method_name]
 
         cls = type.__new__(meta, name, bases, namespace)
         meta.registry.setdefault(name, {})

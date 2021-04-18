@@ -38,19 +38,5 @@ class Siren(db.Model):
     )
     locations = db.relationship(
         'SirenLocation',
-        uselist=True,
-        order_by='desc(SirenLocation.installation_timestamp)',
-        doc=(
-            'All known geographic locations of the siren. '
-            'This allows you to define previous installation sites for '
-            'a specific siren in order to document it moving locations. '
-            'This list is sorted by SirenLocation.installationTimestamp, '
-            'meaning the most recent installation location will appear first.'
-        )
+        lazy='dynamic',
     )
-    # address = db.relationship(
-    #     'SirenAddress',
-    #     foreign_keys=[address_id],
-    #     uselist=False,
-    #     doc='The physical address of the siren.'
-    # )

@@ -9,7 +9,7 @@ class Redis(DelayedInstance):
         if app.testing:
             self.set_instance(FakeRedis())
         else:
-            self.set_instance(Redis_(app.config['APP_REDIS_URL']))
+            self.set_instance(Redis_.from_url(app.config['APP_REDIS_URL']))
 
 
 redis = Redis()

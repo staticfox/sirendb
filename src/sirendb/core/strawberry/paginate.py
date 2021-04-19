@@ -3,10 +3,8 @@ import functools
 import re
 from typing import (
     Any,
-    Dict,
     Generic,
     List,
-    Tuple,
     Optional,
     TypeVar,
 )
@@ -17,10 +15,8 @@ from strawberry.field import StrawberryField
 import sqlalchemy as sa
 
 from .scalars import LimitedStringScalar
-from .type_ import (
-    GraphQLType,
-    table_to_type,
-)
+from .sqlalchemy import _resolve_keys, _build_dataclass
+from .type_ import GraphQLType
 
 
 class PaginatedField:
@@ -176,62 +172,6 @@ class SearchType:
         assert False
 
 
-def _resolve_keys(type_) -> Tuple[Dict[str, Any], set]:
-    keys_with_resolvers = {}
-    keys_without_resolvers = set()
-
-    for field in type_._type_definition.fields:
-        resolver_name = f'resolve_{field.name}'
-
-        if resolver_name in type_.__dict__:
-            keys_with_resolvers[field.name] = getattr(type_, resolver_name)
-        else:
-            keys_without_resolvers.add(field.name)
-
-    return keys_with_resolvers, keys_without_resolvers
-
-
-def _resolve_row(row, keyname):
-    dataclass_kwargs = {}
-
-    if not hasattr(row, '__table__'):
-        return row
-
-    target_type = table_to_type[row.__table__.name]
-
-    with_res, without_res = _resolve_keys(target_type)
-    for key in without_res:
-        dataclass_kwargs[key] = getattr(row, key)
-
-    for key, resolver in with_res.items():
-        dataclass_kwargs[key] = resolver(row)
-
-    return target_type(**dataclass_kwargs)
-
-
-def _build_dataclass(type_, node):
-    keys_with_resolvers, keys_without_resolvers = _resolve_keys(type_)
-    dataclass_kwargs = {}
-
-    type_ = table_to_type.get(node.__table__.name)
-
-    for key in keys_without_resolvers:
-        item = getattr(node, key)
-
-        if isinstance(item, list):
-            dataclass_kwargs[key] = [
-                _resolve_row(i, key)
-                for i in item
-            ]
-        else:
-            dataclass_kwargs[key] = _resolve_row(item, key)
-
-    for key, resolver in keys_with_resolvers.items():
-        dataclass_kwargs[key] = resolver(node)
-
-    return type_(**dataclass_kwargs)
-
-
 @strawberry.type
 class Paginated(Generic[T]):
     items: List[T]
@@ -292,6 +232,7 @@ class Paginated(Generic[T]):
             assert paginate.last is not None
             query = query.limit(paginate.last)
 
+        # TODO: run through processors
         keys_with_resolvers, keys_without_resolvers = _resolve_keys(_node)
 
         data = []

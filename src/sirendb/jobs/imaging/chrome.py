@@ -4,6 +4,7 @@ import sys
 import time
 from typing import Optional
 
+from flask import current_app
 from selenium.webdriver import (
     Chrome as ChromeDriver,
     ChromeOptions,
@@ -24,7 +25,8 @@ class Chrome:
         self._driver.get(url)
 
         # FIXME Wait til it's loaded
-        time.sleep(3)
+        if not current_app.testing or current_app.config.get('USE_REAL_NGINX'):
+            time.sleep(3)
 
         log.debug('taking screenshot...')
         response = self._driver.execute_cdp_cmd('Page.captureScreenshot', {})

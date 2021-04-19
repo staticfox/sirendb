@@ -6,6 +6,8 @@ import subprocess
 import time
 from typing import Optional
 
+from flask import current_app
+
 from .conf import NGINX_CFG
 
 log = logging.getLogger('sirendb.imaging.nginx')
@@ -64,6 +66,9 @@ class Nginx:
         while time.time() - started_at < 3:
             if not self._proc.poll():
                 return
+
+            if current_app.testing:
+                break
 
         log.debug('nginx failed to stop in time, killing')
 

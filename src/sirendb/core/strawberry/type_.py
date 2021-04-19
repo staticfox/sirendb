@@ -17,7 +17,7 @@ from .scalars import (
     StringLimitExceeded,
 )
 
-
+# TODO: move this to sqlalchemy.py
 table_to_type = {}
 
 

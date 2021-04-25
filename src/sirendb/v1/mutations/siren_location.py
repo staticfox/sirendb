@@ -12,8 +12,6 @@ from sirendb.core.strawberry import (
     GraphQLField,
     GraphQLType,
 )
-from sirendb.core.strawberry.ast import ast_to_dict
-from sirendb.core.strawberry.paginate import _build_dataclass
 from sirendb.jobs.imaging import (
     capture_satellite_image,
     capture_streetview_image,
@@ -74,13 +72,6 @@ class Mutation(GraphQLField):
 
     @strawberry.field(description='Registers a siren location within sirendb.')
     def create_siren_location(self, form: Input, info: Info) -> Output:
-        fragments = {}
-
-        for name, value in info.fragments.items():
-            fragments[name] = ast_to_dict(value, {})
-
-        gql_ast_document = ast_to_dict(info.field_nodes, fragments)
-
         if not form.siren_id or Siren.query.get(form.siren_id) is None:
             return Output(
                 ok=False,
@@ -125,10 +116,5 @@ class Mutation(GraphQLField):
             ok=True,
             message='',
             # FIXME: how 2 integrate better?
-            siren_location=_build_dataclass(
-                type_=SirenLocationNode,
-                node=siren_location,
-                gql_ast_document=gql_ast_document,
-                gql_ast_prefix='create_siren_location.siren_location',
-            ),
+            siren_location=GraphQLType.from_sqlalchemy_model(siren_location, info),
         )

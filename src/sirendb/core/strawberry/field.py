@@ -194,6 +194,7 @@ class SchemaFieldRegistry(type):
                 # Make the wrapper impersonate the actual resolver
                 paginated_request.__name__ = value.method_name
                 paginated_request.__annotations__ = {
+                    'info': strawberry.types.info.Info,
                     'paginate': Optional[Paginate],
                     'filter': Optional[filter_type],
                     'sort': Optional[sorting_enum.strawberry_enum],

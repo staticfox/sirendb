@@ -3,6 +3,8 @@ from typing import (
     Optional,
 )
 
+from strawberry.types.info import Info
+
 from sirendb.core.strawberry import GraphQLField
 from sirendb.core.strawberry.field import SortingEnum
 from sirendb.core.strawberry.paginate import Paginate, paginated_field
@@ -21,6 +23,7 @@ class Query(GraphQLField):
         # geolocation: Optional[Tuple[float, float]],
 
         # Provided by paginated_field
+        info: Info,
         paginate: Optional[Paginate] = None,
         sort: Optional[SortingEnum] = None,
         filter: Optional[Any] = None,

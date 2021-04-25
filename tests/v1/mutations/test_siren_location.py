@@ -1,8 +1,10 @@
 from datetime import datetime
 
 from freezegun import freeze_time
+import pytest
 
 from sirendb.models.siren import Siren
+from sirendb.models.siren_manufacturer import SirenManufacturer
 from sirendb.models.siren_model import SirenModel
 from sirendb.models.siren_system import SirenSystem
 
@@ -16,11 +18,11 @@ pytest_plugins = (
 CREATE_QUERY = '''
 fragment LocationProps on SirenLocation {
   media {
-    downloadUrl
+    id
     mediaType
     mimetype
+    downloadUrl
   }
-  # mapCoordinates { ... }
   satelliteLatitude
   satelliteLongitude
   satelliteZoom
@@ -29,13 +31,16 @@ fragment LocationProps on SirenLocation {
   streetHeading
   streetPitch
   streetZoom
-  # ... end mapCoordinates
-  # address { ... }
   installationTimestamp
   removalTimestamp
   siren {
     model {
       name
+      manufacturer {
+        ... on SirenManufacturer {
+          name
+        }
+      }
     }
   }
   system {
@@ -59,8 +64,14 @@ def test_create_siren_location(app, user_client, db):
     with freeze_time('2021-04-03T06:13:09.291212'):
         user, client = user_client
 
+        siren_manufacturer = SirenManufacturer(name='Federal Signal')
+        siren_manufacturer.created_timestamp = datetime.utcnow()
+        db.session.add(siren_manufacturer)
+        db.session.commit()
+
         siren_model = SirenModel(name='3T22A')
         siren_model.created_timestamp = datetime.utcnow()
+        siren_model.manufacturer_id = siren_manufacturer.id
         db.session.add(siren_model)
         db.session.commit()
 
@@ -101,7 +112,10 @@ def test_create_siren_location(app, user_client, db):
     assert response.status_code == 200
 
     response_json = dict(response.json)
-    media = response_json['data']['createSirenLocation']['sirenLocation'].pop('media')
+    try:
+        media = response_json['data']['createSirenLocation']['sirenLocation'].pop('media')
+    except AttributeError:
+        pytest.fail(f'failed to resolve siren_location {response_json["errors"]}')
 
     assert len(media) == 2
     media_types = {'SATELLITE_IMAGE', 'STREET_IMAGE'}
@@ -114,8 +128,8 @@ def test_create_siren_location(app, user_client, db):
     assert response_json == {
         'data': {
             'createSirenLocation': {
-                'message': '',
                 'ok': True,
+                'message': '',
                 'sirenLocation': {
                     'satelliteLatitude': 33.9379329,
                     'satelliteLongitude': -117.275838,
@@ -129,7 +143,10 @@ def test_create_siren_location(app, user_client, db):
                     'removalTimestamp': None,
                     'siren': {
                         'model': {
-                            'name': '3T22A'
+                            'name': '3T22A',
+                            'manufacturer': {
+                                'name': 'Federal Signal',
+                            }
                         }
                     },
                     'system': {

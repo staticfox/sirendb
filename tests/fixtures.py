@@ -41,6 +41,17 @@ def app():
             'TESTING': True,
             'BIN_DIR': '/app/bin',
             'GEO_BUILD_DIR': '/app/geo/build',
+
+            # 'IMAGE_STORE_TYPE': 'fs',
+            # 'IMAGE_STORE_PATH': './images',
+            # 'IMAGE_STORE_BASE_URL': 'http://10.120.70.4:3550/media',
+
+            # 'BIN_DIR': '/home/static/projects/sirendb/bin',
+            # 'GEO_BUILD_DIR': '/home/static/projects/sirendb/geoapp/build',
+            # 'USE_REAL_NGINX': True,
+            # 'USE_REAL_CHROME': True,
+
+
             'IMAGE_STORE_TYPE': 'test',
             'IMAGE_STORE_BASE_URL': 'http://localhost:5000/media',
             # 'SQLALCHEMY_ECHO': True,

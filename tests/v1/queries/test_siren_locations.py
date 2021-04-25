@@ -40,7 +40,9 @@ fragment LocationProps on SirenLocation {
     model {
       name
       manufacturer {
-        name
+        ... on SirenManufacturer {
+          name
+        }
       }
     }
   }

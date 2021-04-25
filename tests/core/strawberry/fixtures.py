@@ -2,6 +2,7 @@ from typing import Any, Optional
 
 import pytest
 import strawberry
+from strawberry.types.info import Info
 
 from sirendb.core.db import db
 from sirendb.core.strawberry import (
@@ -90,7 +91,7 @@ class ExampleTableNode(GraphQLType):
     )
 
     @staticmethod
-    def resolve_direct_field(row, *args, **kwargs):
+    def resolve_direct_field(row, *args, **kwargs) -> str:
         return 'this is from the resolver'
 
 
@@ -113,6 +114,7 @@ class Query(GraphQLField):
         # geolocation: Optional[Tuple[float, float]],
 
         # Provided by paginated_field
+        info: Info,
         paginate: Optional[Paginate] = None,
         sort: Optional[SortingEnum] = None,
         filter: Optional[Any] = None,

@@ -1,15 +1,9 @@
-import typing
-from typing import (
-    Any,
-    Dict,
-    List,
-    Optional,
-)
+from typing import List
 
 import strawberry
 
 from sirendb.core.strawberry import GraphQLType
-from sirendb.core.strawberry.paginate import _build_dataclass
+from sirendb.core.strawberry.type_ import _resolve_sqlalchemy_result
 from sirendb.models.siren import Siren
 from sirendb.models.siren_location import SirenLocation
 from sirendb.utils.debug import ASSERT
@@ -28,39 +22,25 @@ class SirenNode(GraphQLType):
             'model_id',
         )
 
-    previous_locations: typing.List[SirenLocationNode] = strawberry.field(
+    previous_locations: List[SirenLocationNode] = strawberry.field(
         description=(
             'Previous geographic locations where the siren has been installed.'
         )
     )
 
     @staticmethod
-    def resolve_previous_locations(
-        self: SirenLocation,
-        gql_ast_document: List[str],
-        gql_ast_prefix: str,
-        required_keys: List[str],
-        late_resolvers: set,
-        resolved_cache: dict,
-        is_root: bool,
-        visited_tables: List[str],
-    ) -> typing.List[SirenLocationNode]:
-        locations = self.locations.order_by(
+    def resolve_previous_locations(cls, type_info, row, request_document) -> List[SirenLocationNode]:
+        locations = row.locations.order_by(
             SirenLocation.installation_timestamp.desc(),
             SirenLocation.created_timestamp.desc(),
         ).offset(1).all()
 
         rv = [
-            _build_dataclass(
-                type_=SirenLocationNode,
-                node=location,
-                gql_ast_document=gql_ast_document,
-                gql_ast_prefix=gql_ast_prefix,
-                late_resolvers=late_resolvers,
-                resolved_cache=resolved_cache,
-                is_root=is_root,
-                required_keys=required_keys,
-                visited_tables=visited_tables,
+            _resolve_sqlalchemy_result(
+                cls=cls,
+                type_info=type_info,
+                row=location,
+                request_document=request_document,
             )
             for location in locations
         ]
@@ -73,32 +53,17 @@ class SirenNode(GraphQLType):
     )
 
     @staticmethod
-    def resolve_current_location(
-        self: SirenLocation,
-        gql_ast_document: List[str],
-        gql_ast_prefix: str,
-        required_keys: List[str],
-        late_resolvers: set,
-        resolved_cache: dict,
-        is_root: bool,
-        visited_tables: List[str],
-    ) -> SirenLocationNode:
-        location = self.locations.order_by(
+    def resolve_current_location(cls, type_info, row, request_document) -> SirenLocationNode:
+        location = row.locations.order_by(
             SirenLocation.installation_timestamp.desc(),
             SirenLocation.created_timestamp.desc(),
         ).first()
 
-        # breakpoint()
-        rv = _build_dataclass(
-            type_=SirenLocationNode,
-            node=location,
-            gql_ast_document=gql_ast_document,
-            gql_ast_prefix=gql_ast_prefix,
-            late_resolvers=late_resolvers,
-            resolved_cache=resolved_cache,
-            is_root=is_root,
-            required_keys=required_keys,
-            visited_tables=visited_tables,
+        rv = _resolve_sqlalchemy_result(
+            cls=cls,
+            type_info=type_info,
+            row=location,
+            request_document=request_document,
         )
 
         ASSERT(

@@ -11,11 +11,12 @@ from typing import (
 
 from graphql.error.graphql_error import GraphQLError
 import strawberry
+from strawberry.ast import ast_from_info
 from strawberry.field import StrawberryField
+from strawberry.types.info import Info
 import sqlalchemy as sa
 
 from .scalars import LimitedStringScalar
-from .sqlalchemy import _resolve_keys, _build_dataclass
 from .type_ import GraphQLType
 
 
@@ -188,6 +189,7 @@ class Paginated(Generic[T]):
         filter_type,  # TODO type
         sort: Optional[str],
         sorter: Optional[SortingEnum],
+        info: Info,
     ):
         if sort:
             sorting_enum = sorter.enum_to_column.get(sort.name)
@@ -232,12 +234,10 @@ class Paginated(Generic[T]):
             assert paginate.last is not None
             query = query.limit(paginate.last)
 
-        # TODO: run through processors
-        keys_with_resolvers, keys_without_resolvers = _resolve_keys(_node)
-
-        data = []
-        for result in query.all():
-            data.append(_build_dataclass(_node, result))
+        ast = ast_from_info(info)
+        request_document = ast.document_python_names[0][1]
+        request_document = request_document[request_document.index('items') + 1]
+        data = GraphQLType.from_sqlalchemy_model(query.all(), info, request_document)
 
         return cls(
             items=data,

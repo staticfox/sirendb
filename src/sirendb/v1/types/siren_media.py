@@ -1,7 +1,4 @@
-from typing import (
-    List,
-    Optional,
-)
+from typing import Optional
 
 import strawberry
 
@@ -28,16 +25,7 @@ class SirenMediaNode(GraphQLType):
     )
 
     @staticmethod
-    def resolve_download_url(
-        self: SirenMedia,
-        gql_ast_document: List[str],
-        gql_ast_prefix: str,
-        required_keys: List[str],
-        late_resolvers: set,
-        resolved_cache: dict,
-        is_root: bool,
-        visited_tables: List[str],
-    ) -> Optional[str]:
+    def resolve_download_url(cls, type_info, row, request_document) -> Optional[str]:
         if not storage.enabled:
             return None
-        return storage.base_url + '/' + self.filename
+        return storage.base_url + '/' + row.filename

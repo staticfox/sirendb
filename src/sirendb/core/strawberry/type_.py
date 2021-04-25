@@ -1,14 +1,20 @@
+from __future__ import annotations
+
 from dataclasses import MISSING
 from enum import Enum
 import inspect
+from logging import getLogger
 import typing
 
 from flask_sqlalchemy import Model
+from graphql.pyutils.convert_case import camel_to_snake
 from sqlalchemy import inspect as sql_inspect
 from sqlalchemy.orm.relationships import RelationshipProperty
 from sqlalchemy.sql.schema import Column
 import strawberry
+from strawberry.ast import ast_from_info, LabelMap
 from strawberry.field import StrawberryField
+from strawberry.types.info import Info
 from strawberry.types.types import TypeDefinition
 from strawberry.utils.str_converters import to_camel_case
 
@@ -19,6 +25,13 @@ from .scalars import (
 
 # TODO: move this to sqlalchemy.py
 table_to_type = {}
+type_info_map = {}
+
+log = getLogger('sirendb.core.strawberry.type')
+
+
+class MissingFieldError(RuntimeError):
+    pass
 
 
 def _column_to_field(column: Column) -> StrawberryField:
@@ -54,7 +67,7 @@ def _column_to_field(column: Column) -> StrawberryField:
 
     return StrawberryField(**{
         'python_name': column.key,
-        'graphql_name': column.key,
+        'graphql_name': to_camel_case(column.key),
         'type_': type_,
         'is_optional': column.nullable,
         'default_value': column.default,
@@ -75,7 +88,7 @@ def _generate_field_kwargs(relationship: RelationshipProperty):
     type_ = table_to_type[relationship.target.name]
     field_kwargs = {
         'python_name': relationship.key,
-        'graphql_name': relationship.key,
+        'graphql_name': to_camel_case(relationship.key),
         'child': type_,
         'description': relationship.doc,
     }
@@ -83,7 +96,7 @@ def _generate_field_kwargs(relationship: RelationshipProperty):
         field_kwargs.update({
             'is_list': True,
             'is_optional': False,
-            'default_value': [],
+            'default_factory': [],
             'type_': typing.List[type_],
         })
     else:
@@ -141,6 +154,157 @@ def _extract_sqlalchemy_orm_columns(
         fields[relationship.key] = _relationship_to_field(relationship)
 
     return fields
+
+
+def _sqlalchemy_column_required(
+    cls: GraphQLType,
+    column_name: str,
+):
+    column = getattr(cls.Meta.sqlalchemy_model, column_name, None)
+    if column and hasattr(column, 'nullable'):
+        return column.nullable is False
+
+    datafield_required = True
+    data_fields = cls.__dict__['__dataclass_fields__']
+    if column_name in data_fields:
+        datafield = data_fields[column_name]
+        if not hasattr(datafield, 'is_optional') and hasattr(datafield, 'type'):
+            datafield_required = datafield.type.is_optional is False
+        else:
+            datafield_required = datafield.is_optional is False
+    return datafield_required
+
+
+def _resolve_sqlalchemy_result(
+    cls: GraphQLType,
+    type_info: dict,
+    row: Model,
+    request_document: LabelMap,
+):
+    namespace = {}
+
+    columns = [
+        (key, value)
+        for key, value in type_info['without_default']
+    ]
+    columns.extend([
+        (key, value)
+        for key, value in type_info['with_default'].items()
+    ])
+
+    for column_name, field_cls in columns:
+        if column_name in type_info['with_resolver']:
+            continue
+
+        datafield_required = _sqlalchemy_column_required(cls, column_name)
+
+        column_request_document = None
+        for field in request_document:
+            if isinstance(field, list) and len(field) > 1:
+                if field[0] == column_name and isinstance(field[1], list):
+                    column_request_document = field[1]
+            elif field == column_name:
+                column_request_document = [column_name]
+
+        if not datafield_required and column_request_document is None:
+            log.debug(f'SKIP: {column_name}')
+            continue
+
+        value = getattr(row, column_name)
+
+        if column_request_document and column_request_document != [column_name]:
+            assert isinstance(request_document, list)
+
+            log.debug(f'TYPE: {column_name} = {value} ... resolving')
+            if isinstance(value, list):
+                namespace[column_name] = []
+                sub_table_name = value[0].__table__.name
+                for sub_row in value:
+                    namespace[column_name].append(_resolve_sqlalchemy_result(
+                        cls=table_to_type[sub_table_name],
+                        type_info=type_info_map[sub_table_name],
+                        row=sub_row,
+                        request_document=column_request_document,
+                    ))
+            else:
+                sub_table_name = value.__table__.name
+                namespace[column_name] = _resolve_sqlalchemy_result(
+                    cls=table_to_type[sub_table_name],
+                    type_info=type_info_map[sub_table_name],
+                    row=value,
+                    request_document=column_request_document,
+                )
+
+            log.debug(f'TYPE: {column_name} = {namespace[column_name]}')
+        else:
+            namespace[column_name] = value
+            log.debug(f'SCALAR: {column_name} = {value}')
+
+    for column_name, (field_value, missing_default) in type_info['with_resolver'].items():
+        datafield_required = _sqlalchemy_column_required(cls, column_name)
+
+        column_request_document = None
+        for index, field in enumerate(request_document):
+            if isinstance(field, list) and len(field) > 1:
+                if field[0] == column_name and isinstance(field[1], list):
+                    column_request_document = field[1]
+            elif field == column_name:
+                column_request_document = [column_name]
+                if index + 1 < len(request_document):
+                    if isinstance(request_document[index + 1], list):
+                        column_request_document = request_document[index + 1]
+
+        if not datafield_required and column_request_document is None:
+            log.debug(f'SKIP: {column_name}')
+            continue
+
+        resolver_name = 'resolve_' + column_name
+        method = getattr(cls, resolver_name)
+
+        return_type = method.__annotations__['return']
+        if hasattr(return_type, '__origin__'):
+            return_type, *_ = typing.get_args(method.__annotations__['return'])
+
+        log.debug(f'RESOLVE: {column_name} = {row} ... resolving')
+        if hasattr(return_type, 'Meta'):
+            return_type_info = type_info_map[return_type.Meta.sqlalchemy_model.__table__.name]
+            namespace[column_name] = method(
+                cls=return_type,
+                type_info=return_type_info,
+                row=row,
+                request_document=column_request_document or request_document,
+            )
+        else:
+            namespace[column_name] = method(
+                cls=return_type,
+                type_info=None,
+                row=row,
+                request_document=column_request_document or request_document,
+            )
+        log.debug(f'RESOLVE: {column_name} = {namespace[column_name]}')
+
+    ordered_keys = inspect.getfullargspec(cls.__dict__['__init__']).args
+    for index, key in enumerate(ordered_keys):
+        if index > 0 and key not in namespace:
+            field = type_info['with_default'].get(key)
+            datafield_required = _sqlalchemy_column_required(cls, key)
+
+            if not field and datafield_required:
+                raise MissingFieldError(
+                    f'{cls.Meta.name}.{key} is required but was not provided by {row} {namespace.keys()}'
+                )
+
+            if field and hasattr(field.type, '__origin__'):
+                namespace[key] = []
+            else:
+                namespace[key] = None
+
+            log.debug(f'DEFAULT: {key} = {namespace[key]}')
+
+    dataclass_kwargs = {}
+    for key in cls.__annotations__.keys():
+        dataclass_kwargs[key] = namespace[key]
+    return cls(**dataclass_kwargs)
 
 
 def is_valid_field(item) -> bool:
@@ -253,7 +417,7 @@ class SchemaTypeMeta(type):
         #
 
         without_default = []
-        with_default = []
+        with_default = {}
         with_resolver = {}
 
         for field_name, field_value in cls_namespce.items():
@@ -284,7 +448,7 @@ class SchemaTypeMeta(type):
             if missing_default:
                 without_default.append((field_name, field_value))
             else:
-                with_default.append((field_name, field_value))
+                with_default[field_name] = field_value
 
         # print(f'{with_default=} {without_default=}')
         # without_default.sort(key=lambda pair: pair[0])
@@ -301,7 +465,7 @@ class SchemaTypeMeta(type):
             new_cls_namespce[field_name] = field_value
 
         # Insert fields with default values after.
-        for field_name, field_value in with_default:
+        for field_name, field_value in with_default.items():
             new_cls_namespce[field_name] = field_value
 
         old_annotations = dict(cls_namespce['__annotations__'])
@@ -344,8 +508,15 @@ class SchemaTypeMeta(type):
             straberry_cls._type_definition._fields,
             key=lambda field: field.graphql_name
         )
+
+        # Add it to our table cache
         if sqlalchemy_model:
             table_to_type[sqlalchemy_model.__table__.name] = straberry_cls
+            type_info_map[sqlalchemy_model.__table__.name] = {
+                'without_default': without_default,
+                'with_default': with_default,
+                'with_resolver': with_resolver,
+            }
 
         meta.types[cls_name] = straberry_cls
         return straberry_cls
@@ -372,6 +543,54 @@ class SchemaTypeMeta(type):
                 if field.name == field_name:
                     strawberry_cls.__dict__['_type_definition']._fields[index] = resolver()
 
+        for table_name, options in type_info_map.items():
+            for key, value in options['with_default'].items():
+                if callable(value) and getattr(value, '__name__', '') == '<lambda>':
+                    type_info_map[table_name]['with_default'][key] = value()
+
 
 class GraphQLType(metaclass=SchemaTypeMeta):
-    pass
+    @staticmethod
+    def from_sqlalchemy_model(result, info: Info, request_document: LabelMap = None):
+        if result == []:
+            return []
+        elif not result:
+            return None
+
+        if isinstance(result, list):
+            table_name = result[0].__table__.name
+        else:
+            table_name = result.__table__.name
+
+        strawberry_type = table_to_type[table_name]
+        type_info = type_info_map[table_name]
+        this_field_name = camel_to_snake(strawberry_type.Meta.name)
+
+        if not request_document:
+            ast = ast_from_info(info)
+            request_document = ast.document_python_names[0]
+            document_field_name = camel_to_snake(info.field_name)
+            document_field_index = request_document.index(document_field_name)
+            request_document = request_document[document_field_index + 1]
+
+            this_field_index = request_document.index(this_field_name)
+            request_document = request_document[this_field_index + 1]
+
+        log.debug(f'from_sqlalchemy_model {strawberry_type.Meta.name} {type(result).__name__}')
+        if isinstance(result, list):
+            return [
+                _resolve_sqlalchemy_result(
+                    cls=strawberry_type,
+                    type_info=type_info,
+                    row=resolved_row,
+                    request_document=request_document,
+                )
+                for resolved_row in result
+            ]
+
+        return _resolve_sqlalchemy_result(
+            cls=strawberry_type,
+            type_info=type_info,
+            row=result,
+            request_document=request_document,
+        )

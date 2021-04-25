@@ -17,23 +17,23 @@ class Function(NamedTuple):
 
 
 def _get_caller() -> Function:
-    for index, frame in enumerate(inspect.stack()):
-        if index == 0 or frame.function == 'ASSERT':
-            continue
+    frame = inspect.stack()[2]
 
-        module_path = str(frame.filename)
-        idx = module_path.rfind('sirendb.')
-        module_path = module_path[idx:]
-        module_path = module_path[:-3]
+    module_path = str(frame.filename)
+    idx = module_path.rfind('sirendb.')
+    module_path = module_path[idx:]
+    module_path = module_path[:-3]
+    if frame.code_context:
         failing_assert_statement = ' '.join([ctx.strip() for ctx in frame.code_context])
+    else:
+        failing_assert_statement = 'UNKNOWN'
 
-        # TODO: interpolate variables
-        return Function(
-            module_name=module_path,
-            function_name=frame.function,
-            lineno=frame.lineno,
-            statement=failing_assert_statement,
-        )
+    return Function(
+        module_name=module_path,
+        function_name=frame.function,
+        lineno=frame.lineno,
+        statement=failing_assert_statement,
+    )
 
 
 def ASSERT(condition, message):

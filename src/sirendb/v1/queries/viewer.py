@@ -16,10 +16,12 @@ class Query(GraphQLField):
         if not current_user.is_authenticated:
             return None
 
-        return UserNode(
-            id=current_user.id,
-            username=current_user.username,
-            email=current_user.email,
-            register_timestamp=current_user.register_timestamp,
-            email_verified_timestamp=current_user.email_verified_timestamp,
-        )
+        data = {
+            'id': current_user.id,
+            'username': current_user.username,
+            'email': current_user.email,
+            'register_timestamp': current_user.register_timestamp,
+            'email_verified_timestamp': current_user.email_verified_timestamp,
+        }
+
+        return UserNode.ordered_args(data)

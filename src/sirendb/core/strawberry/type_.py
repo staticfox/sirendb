@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import MISSING
 from enum import Enum
+import functools
 import inspect
 from logging import getLogger
 import typing
@@ -13,6 +14,7 @@ from sqlalchemy.orm.relationships import RelationshipProperty
 from sqlalchemy.sql.schema import Column
 import strawberry
 from strawberry.ast import ast_from_info, LabelMap
+from strawberry.enum import EnumDefinition
 from strawberry.field import StrawberryField
 from strawberry.types.info import Info
 from strawberry.types.types import TypeDefinition
@@ -41,10 +43,12 @@ def _column_to_field(column: Column) -> StrawberryField:
         description = description.strip().rstrip()
 
     if issubclass(type_, Enum):
-        return strawberry.enum(Enum(type_.key, ' '.join([
+        enum = Enum(type_.key, ' '.join([
             key
             for key in type_.__members__.keys()
-        ])))
+        ]))
+        enum.__doc__ = description
+        return strawberry.enum(enum, description=description)
 
     # Allow the type itself to raise the GraphQL error
     # instead of doing basic repetitive string size checks
@@ -122,7 +126,12 @@ def _enum_to_field(column: Column, cls_name: str):
         key
         for key in column.type.python_type.__members__.keys()
     ])
-    return strawberry.enum(Enum(enum_name, enum_fields))
+    enum = Enum(enum_name, enum_fields)
+    enum.__doc__ = column.doc
+    rv = strawberry.enum(enum, description=column.doc)
+    rv.description = column.doc
+    rv.__doc__ = column.doc
+    return rv
 
 
 def _extract_sqlalchemy_orm_columns(
@@ -211,6 +220,9 @@ def _resolve_sqlalchemy_result(
             continue
 
         value = getattr(row, column_name)
+        if not value:
+            namespace[column_name] = value
+            continue
 
         if column_request_document and column_request_document != [column_name]:
             assert isinstance(request_document, list)
@@ -301,10 +313,7 @@ def _resolve_sqlalchemy_result(
 
             log.debug(f'DEFAULT: {key} = {namespace[key]}')
 
-    dataclass_kwargs = {}
-    for key in cls.__annotations__.keys():
-        dataclass_kwargs[key] = namespace[key]
-    return cls(**dataclass_kwargs)
+    return cls.ordered_args(namespace)
 
 
 def is_valid_field(item) -> bool:
@@ -317,7 +326,8 @@ def is_valid_field(item) -> bool:
         if issubclass(item, StrawberryField):
             return True
 
-        if issubclass(item, Enum):
+        type_def = getattr(item, '_enum_definition', None)
+        if isinstance(type_def, EnumDefinition):
             return True
 
         type_def = getattr(item, '_type_definition', None)
@@ -349,8 +359,8 @@ class SchemaTypeMeta(type):
             return type.__new__(meta, name, bases, namespace)
 
         cls_name = str(name)
-        cls_namespce = dict(namespace)
-        cls_namespce.setdefault('__annotations__', {})
+        cls_namespace = dict(namespace)
+        cls_namespace.setdefault('__annotations__', {})
 
         # Description is set based on the following priority list:
         #   1) cls.Meta.description
@@ -376,15 +386,15 @@ class SchemaTypeMeta(type):
                     only_fields=only_fields,
                 )
                 for field_name, field_value in fields.items():
-                    if field_name in cls_namespce:
+                    if field_name in cls_namespace:
                         continue
 
                     if hasattr(field_value, 'type'):
-                        cls_namespce['__annotations__'][field_name] = field_value.type
+                        cls_namespace['__annotations__'][field_name] = field_value.type
                     else:
-                        cls_namespce['__annotations__'][field_name] = field_value
+                        cls_namespace['__annotations__'][field_name] = field_value
 
-                    cls_namespce[field_name] = field_value
+                    cls_namespace[field_name] = field_value
 
                 model_doc = sqlalchemy_model.__dict__.get('__doc__')
                 if model_doc and not description:
@@ -397,10 +407,10 @@ class SchemaTypeMeta(type):
                         'Feel free to remove this check and proceed at your own risk.'
                     )
                 for field_name in Meta.only_fields:
-                    if field_name in cls_namespce:  # ??
+                    if field_name in cls_namespace:  # ??
                         continue
-                    cls_namespce[field_name] = Meta.node.__dataclass_fields__[field_name]
-                    cls_namespce['__annotations__'][field_name] = Meta.node.__annotations__[field_name]
+                    cls_namespace[field_name] = Meta.node.__dataclass_fields__[field_name]
+                    cls_namespace['__annotations__'][field_name] = Meta.node.__annotations__[field_name]
 
             if getattr(Meta, 'description', None):
                 description = Meta.description
@@ -420,7 +430,7 @@ class SchemaTypeMeta(type):
         with_default = {}
         with_resolver = {}
 
-        for field_name, field_value in cls_namespce.items():
+        for field_name, field_value in cls_namespace.items():
             field_value_name = getattr(field_value, '__name__', '')
             is_late_resolver = bool(
                 callable(field_value) and field_value_name == '<lambda>'
@@ -457,35 +467,35 @@ class SchemaTypeMeta(type):
         # Python 3.7+ guarentees that the built-in dict class
         # will retain insertion order, so an OrderedDict is
         # not needed.
-        new_cls_namespce = {}
+        new_cls_namespace = {}
         new_cls_annotations = {}
 
         # Insert fields without default values first.
         for field_name, field_value in without_default:
-            new_cls_namespce[field_name] = field_value
+            new_cls_namespace[field_name] = field_value
 
         # Insert fields with default values after.
         for field_name, field_value in with_default.items():
-            new_cls_namespce[field_name] = field_value
+            new_cls_namespace[field_name] = field_value
 
-        old_annotations = dict(cls_namespce['__annotations__'])
-        # Since new_cls_namespce is correctly sorted, we can re-apply
+        old_annotations = dict(cls_namespace['__annotations__'])
+        # Since new_cls_namespace is correctly sorted, we can re-apply
         # the annotations in the same order.
-        for key, value in new_cls_namespce.items():
+        for key, value in new_cls_namespace.items():
             new_cls_annotations[key] = old_annotations[key]
 
         # Add the annotations then re-add the rest of the namespace.
-        new_cls_namespce['__annotations__'] = new_cls_annotations
+        new_cls_namespace['__annotations__'] = new_cls_annotations
 
-        for key, value in cls_namespce.items():
-            if key in new_cls_namespce:
+        for key, value in cls_namespace.items():
+            if key in new_cls_namespace:
                 continue
-            new_cls_namespce[key] = value
+            new_cls_namespace[key] = value
 
         # # Drop in resolvers now
         for key, (value, missing_default) in with_resolver.items():
-            assert key in new_cls_namespce['__annotations__'], f'{key} not in namespace!'
-            new_cls_namespce['resolve_' + key] = value
+            assert key in new_cls_namespace['__annotations__'], f'{key} not in namespace!'
+            new_cls_namespace['resolve_' + key] = value
 
         # GraphQL treats input types different from regular types.
         if namespace.get('__isinput__') is True:
@@ -494,11 +504,19 @@ class SchemaTypeMeta(type):
             strawberry_type = strawberry.type
 
         # Setup our Strawberry type so dataclass is happy.
-        cls = type.__new__(meta, name, (object,), new_cls_namespce)
+        cls = type.__new__(meta, name, (object,), new_cls_namespace)
         straberry_cls = strawberry_type(
             cls,
             name=cls_name,
             description=description,
+        )
+
+        straberry_cls.ordered_args = functools.partial(
+            _ordered_args, straberry_cls
+        )
+
+        straberry_cls.from_sqlalchemy_model = functools.partial(
+            _from_sqlalchemy_model, straberry_cls
         )
 
         # Now that everything has been created properly, we can
@@ -549,48 +567,52 @@ class SchemaTypeMeta(type):
                     type_info_map[table_name]['with_default'][key] = value()
 
 
+def _ordered_args(cls, result: typing.Dict[str, typing.Any]):
+    args = []
+    for key in cls.__annotations__.keys():
+        args.append(result[key])
+    return cls(*args)
+
+
+def _from_sqlalchemy_model(cls, result, info: Info, request_document: LabelMap = None):
+    if result == []:
+        return []
+    elif not result:
+        return None
+
+    table_name = cls.Meta.sqlalchemy_model.__table__.name
+    type_info = type_info_map[table_name]
+    this_field_name = camel_to_snake(cls.Meta.name)
+
+    if not request_document:
+        ast = ast_from_info(info)
+        request_document = ast.document_python_names[0]
+        document_field_name = camel_to_snake(info.field_name)
+        document_field_index = request_document.index(document_field_name)
+        request_document = request_document[document_field_index + 1]
+
+        this_field_index = request_document.index(this_field_name)
+        request_document = request_document[this_field_index + 1]
+
+    log.debug(f'from_sqlalchemy_model {cls.Meta.name} {type(result).__name__}')
+    if isinstance(result, list):
+        return [
+            _resolve_sqlalchemy_result(
+                cls=cls,
+                type_info=type_info,
+                row=resolved_row,
+                request_document=request_document,
+            )
+            for resolved_row in result
+        ]
+
+    return _resolve_sqlalchemy_result(
+        cls=cls,
+        type_info=type_info,
+        row=result,
+        request_document=request_document,
+    )
+
+
 class GraphQLType(metaclass=SchemaTypeMeta):
-    @staticmethod
-    def from_sqlalchemy_model(result, info: Info, request_document: LabelMap = None):
-        if result == []:
-            return []
-        elif not result:
-            return None
-
-        if isinstance(result, list):
-            table_name = result[0].__table__.name
-        else:
-            table_name = result.__table__.name
-
-        strawberry_type = table_to_type[table_name]
-        type_info = type_info_map[table_name]
-        this_field_name = camel_to_snake(strawberry_type.Meta.name)
-
-        if not request_document:
-            ast = ast_from_info(info)
-            request_document = ast.document_python_names[0]
-            document_field_name = camel_to_snake(info.field_name)
-            document_field_index = request_document.index(document_field_name)
-            request_document = request_document[document_field_index + 1]
-
-            this_field_index = request_document.index(this_field_name)
-            request_document = request_document[this_field_index + 1]
-
-        log.debug(f'from_sqlalchemy_model {strawberry_type.Meta.name} {type(result).__name__}')
-        if isinstance(result, list):
-            return [
-                _resolve_sqlalchemy_result(
-                    cls=strawberry_type,
-                    type_info=type_info,
-                    row=resolved_row,
-                    request_document=request_document,
-                )
-                for resolved_row in result
-            ]
-
-        return _resolve_sqlalchemy_result(
-            cls=strawberry_type,
-            type_info=type_info,
-            row=result,
-            request_document=request_document,
-        )
+    pass

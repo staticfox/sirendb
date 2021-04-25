@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import strawberry
+from strawberry.types.info import Info
 
 from sirendb.core.db import db
 from sirendb.core.strawberry import (
@@ -43,20 +44,20 @@ class Output(GraphQLType):
 
     ok: bool = strawberry.field(
         description='Whether or not the siren system was created.'
-    )
+    )  # type: ignore
     message: str = strawberry.field(
         description='Status message related to the creation.'
-    )
+    )  # type: ignore
     siren_system: SirenSystemNode = strawberry.field(
         description='The newely registered siren system.'
-    )
+    )  # type: ignore
 
 
 class Mutation(GraphQLField):
     __endpoints__ = ('/api/v1/graphql',)
 
     @strawberry.field(description='Registers a siren system within sirendb.')
-    def create_siren_system(self, form: Input) -> Output:
+    def create_siren_system(self, form: Input, info: Info) -> Output:
         kwargs = {
             k: getattr(form, k)
             for k in form.__annotations__.keys()
@@ -66,8 +67,10 @@ class Mutation(GraphQLField):
         db.session.add(siren_system)
         db.session.commit()
 
-        return Output(
-            ok=True,
-            message='',
-            siren_system=siren_system,
-        )
+        data = {
+            'ok': True,
+            'message': '',
+            'siren_system': SirenSystemNode.from_sqlalchemy_model(siren_system, info),
+        }
+
+        return Output.ordered_args(data)

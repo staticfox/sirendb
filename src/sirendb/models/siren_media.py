@@ -8,6 +8,9 @@ from .siren_location import SirenLocation  # noqa
 
 
 class SirenMediaType(enum.Enum):
+    '''
+    The type of media.
+    '''
     SATELLITE_IMAGE = enum.auto()
     STREET_IMAGE = enum.auto()
 

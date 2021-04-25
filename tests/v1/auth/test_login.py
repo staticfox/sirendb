@@ -5,6 +5,7 @@ from sirendb.models.user import User
 
 pytest_plugins = (
     'tests.fixtures',
+    'tests.v1.auth.fixtures',
 )
 
 VIEWER_QUERY = '''

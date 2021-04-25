@@ -1,5 +1,3 @@
-from typing import Optional
-
 from .base import StorageBase
 
 
@@ -8,5 +6,5 @@ class NullBackend(StorageBase):
         super().__init__(config)
         self.enabled = False
 
-    def generate_key(self) -> Optional[str]:
-        return None
+    def generate_key(self) -> str:
+        return ''

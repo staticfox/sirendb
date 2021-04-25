@@ -26,7 +26,7 @@ class SirenNode(GraphQLType):
         description=(
             'Previous geographic locations where the siren has been installed.'
         )
-    )
+    )  # type: ignore
 
     @staticmethod
     def resolve_previous_locations(cls, type_info, row, request_document) -> List[SirenLocationNode]:
@@ -50,7 +50,7 @@ class SirenNode(GraphQLType):
 
     current_location: SirenLocationNode = strawberry.field(
         description='Current geographic location of the siren.'
-    )
+    )  # type: ignore
 
     @staticmethod
     def resolve_current_location(cls, type_info, row, request_document) -> SirenLocationNode:

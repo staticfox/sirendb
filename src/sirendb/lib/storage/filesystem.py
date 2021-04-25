@@ -7,7 +7,7 @@ from .results import SaveResult
 
 class FilesystemBackend(StorageBase):
     def __init__(self, config: dict):
-        self._path = config.get('path')
+        self._path = config.get('path', '')
         super().__init__(config)
 
     def save(self, data: bytes, file_extension: str, mime_type: str) -> Optional[SaveResult]:

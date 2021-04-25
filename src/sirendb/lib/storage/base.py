@@ -11,7 +11,7 @@ class StorageBase:
         self.base_url = config.get('base_url')
         self.enabled = True
 
-    def generate_key(self) -> Optional[str]:
+    def generate_key(self) -> str:
         while True:
             key = secrets.token_hex(16)
 

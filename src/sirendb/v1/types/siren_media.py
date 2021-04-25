@@ -22,7 +22,7 @@ class SirenMediaNode(GraphQLType):
 
     download_url: Optional[str] = strawberry.field(
         description='Network location of this media.',
-    )
+    )  # type: ignore
 
     @staticmethod
     def resolve_download_url(cls, type_info, row, request_document) -> Optional[str]:

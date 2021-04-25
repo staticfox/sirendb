@@ -116,5 +116,5 @@ class Mutation(GraphQLField):
             ok=True,
             message='',
             # FIXME: how 2 integrate better?
-            siren_location=GraphQLType.from_sqlalchemy_model(siren_location, info),
+            siren_location=SirenLocationNode.from_sqlalchemy_model(siren_location, info),
         )

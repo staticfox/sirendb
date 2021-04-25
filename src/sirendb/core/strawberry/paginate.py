@@ -237,7 +237,7 @@ class Paginated(Generic[T]):
         ast = ast_from_info(info)
         request_document = ast.document_python_names[0][1]
         request_document = request_document[request_document.index('items') + 1]
-        data = GraphQLType.from_sqlalchemy_model(query.all(), info, request_document)
+        data = _node.from_sqlalchemy_model(query.all(), info, request_document)
 
         return cls(
             items=data,

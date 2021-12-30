@@ -1,0 +1,8 @@
+__pycache__/
+.venv/
+.python-version
+.env
+*.egg-info/
+*.sublime-*
+etc/config.yml
+.coverage

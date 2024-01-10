@@ -66,28 +66,32 @@ def client(app):
         yield app.test_client()
 
 
+def _run(args):
+    subprocess.run(args)#, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+
+
 @pytest.fixture(scope='session')
 def postgresql():
     temp_dir = tempfile.mkdtemp(prefix='sirendb.')
 
-    subprocess.run([
+    _run([
         'pg_ctl', 'initdb', '--pgdata', temp_dir
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+    ])
 
-    subprocess.run([
+    _run([
         'pg_ctl', '--pgdata', temp_dir, '--wait', '--options', f'-h "" -k "{temp_dir}"', 'start'
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+    ])
 
-    subprocess.run([
+    _run([
         'createdb', '-h', temp_dir, 'sirendb_test'
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+    ])
 
     yield f'postgresql+psycopg2:///sirendb_test?host={temp_dir}'
 
     try:
-        subprocess.run([
+        _run([
             'pg_ctl', '-D', temp_dir, '-m', 'immediate', 'stop'
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+        ])
     finally:
         shutil.rmtree(temp_dir)
 

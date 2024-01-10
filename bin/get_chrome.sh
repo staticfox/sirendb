@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -eu -o pipefail
+
 cd $(dirname $0)
 
 REVISION="866442"
@@ -9,8 +11,8 @@ if [ -d $REVISION ] ; then
   exit
 fi
 
-echo $ZIP_URL
 ZIP_URL="https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Linux_x64%2F$REVISION%2Fchrome-linux.zip?alt=media"
+echo $ZIP_URL
 
 ZIP_FILE="${REVISION}-chrome-linux.zip"
 

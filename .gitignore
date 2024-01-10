@@ -6,3 +6,8 @@ __pycache__/
 *.sublime-*
 etc/config.yml
 .coverage
+bin/866442/
+bin/chromedriver
+bin/latest
+bin/nginx-1.18.0/
+bin/nginx/

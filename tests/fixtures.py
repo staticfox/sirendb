@@ -16,7 +16,7 @@ from sirendb.web.flask import create_app
 def redis(app, client):
     yield
 
-    if type(redis_.__local) != FakeRedis:
+    if type(redis_.__local) is not FakeRedis:
         assert False, 'you should be using fakeredis!'
         return
 
@@ -67,7 +67,7 @@ def client(app):
 
 
 def _run(args):
-    subprocess.run(args)#, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+    subprocess.run(args)  # , stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
 
 @pytest.fixture(scope='session')

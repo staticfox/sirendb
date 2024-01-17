@@ -9,6 +9,7 @@ import pytest
 
 from sirendb.core.db import db as db_
 from sirendb.core.redis import redis as redis_
+from sirendb.utils.debug import ASSERT
 from sirendb.web.flask import create_app
 
 
@@ -16,9 +17,7 @@ from sirendb.web.flask import create_app
 def redis(app, client):
     yield
 
-    if type(redis_.__local) is not FakeRedis:
-        assert False, 'you should be using fakeredis!'
-        return
+    ASSERT(isinstance(redis_.__local, FakeRedis), 'you should be using fakeredis!')
 
     redis_.flushall()
 

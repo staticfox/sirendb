@@ -11,3 +11,4 @@ bin/chromedriver
 bin/latest
 bin/nginx-1.18.0/
 bin/nginx/
+.pytest_cache

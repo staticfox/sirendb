@@ -1,3 +1,6 @@
++ [![cov](https://staticfox.github.io/sirendb/badges/coverage.svg)](https://github.com/staticfox/sirendb/actions)
+
+
 SirenDB
 =======
 
